@@ -1,5 +1,8 @@
 import { sound } from './audio.js';
+import { audioMaster } from './audioMaster.js';
 import { dialogue, initAdmin } from './dialogue.js';
+import { BitManager } from './bits.js';
+import { StoryMaster } from './storyMaster.js';
 
 // Canvas Elements
 const canvas = document.getElementById('gameCanvas');
@@ -9,7 +12,7 @@ const ctx = canvas.getContext('2d');
 const VIRTUAL_HEIGHT = 512;
 let virtualWidth = 1024;
 let scale = 1;
-const GROUND_Y = 380;
+const GROUND_Y = 388;
 
 // Input state
 const keys = {
@@ -19,7 +22,14 @@ const keys = {
   run: false
 };
 
-// Particles for dust effects
+// Systems
+const bitManager = new BitManager(sound);
+bitManager.initDefaultBits();
+
+const storyMaster = new StoryMaster(dialogue, audioMaster);
+storyMaster.setBitManager(bitManager);
+
+// Particles for dust & sparkles
 const particles = [];
 function createDust(x, y, count = 3, color = 'rgba(230, 245, 230, 0.75)') {
   for (let i = 0; i < count; i++) {
@@ -41,12 +51,12 @@ const camera = {
   x: 0
 };
 
-// Cinematic Letterbox System (Rendered directly on canvas layer)
+// Cinematic Letterbox System
 const cinematic = {
   active: true,
-  progress: 1.0,   // 1.0 = fully closed cinematic bars, 0.0 = fully open
+  progress: 1.0,
   target: 1.0,
-  barHeight: 88,   // virtual pixels height for top and bottom letterbox bars
+  barHeight: 80,
 
   update(dt) {
     if (this.progress !== this.target) {
@@ -64,9 +74,7 @@ const cinematic = {
     const currentH = this.barHeight * this.progress;
 
     ctx.fillStyle = '#000000';
-    // Upper cinematic bar (slides upward off-screen)
     ctx.fillRect(0, 0, virtualWidth, currentH);
-    // Lower cinematic bar (slides downward off-screen)
     ctx.fillRect(0, VIRTUAL_HEIGHT - currentH, virtualWidth, currentH);
   },
 
@@ -81,7 +89,6 @@ const cinematic = {
   }
 };
 
-// Connect dialogue dismiss to cinematic dismiss
 dialogue.setOnDismiss(() => {
   cinematic.dismiss();
 });
@@ -89,13 +96,13 @@ dialogue.setOnDismiss(() => {
 // Player Object (Zsomborr)
 const player = {
   name: 'Zsomborr',
-  x: 512,
+  x: 400,
   y: GROUND_Y,
   height: 125,
   vx: 0,
   vy: 0,
-  speed: 4.2,
-  runSpeed: 7.2,
+  speed: 4.4,
+  runSpeed: 7.6,
   gravity: 0.58,
   jumpStrength: -13.2,
   isGrounded: true,
@@ -157,11 +164,14 @@ const player = {
       this.state = 'jumping';
     }
 
-    // Horizontal movement & camera tracking
-    this.x += this.vx;
+    // Horizontal movement & boundaries
+    this.x = Math.max(100, this.x + this.vx);
     camera.x = this.x - virtualWidth / 2;
 
     this.idleTimer += dt * 3;
+
+    // Notify story master of movement
+    storyMaster.onPlayerMove(this.x);
   },
 
   draw(ctx) {
@@ -311,7 +321,7 @@ function updateAndDrawParticles(ctx, dt) {
     const screenY = p.y;
 
     ctx.fillStyle = p.color;
-    ctx.globalAlpha = p.life;
+    ctx.globalAlpha = Math.max(0, p.life);
     ctx.fillRect(Math.round(screenX), Math.round(screenY), p.size, p.size);
   }
   ctx.globalAlpha = 1.0;
@@ -328,6 +338,8 @@ function bindTouch(btnId, keyName) {
     if (keyName === 'jump') {
       player.tryJump();
       keys.jump = true;
+    } else if (keyName === 'interact') {
+      storyMaster.interactApartment(player);
     } else {
       keys[keyName] = true;
     }
@@ -335,7 +347,9 @@ function bindTouch(btnId, keyName) {
   const end = (e) => {
     e.preventDefault();
     btn.classList.remove('active');
-    keys[keyName] = false;
+    if (keyName !== 'interact') {
+      keys[keyName] = false;
+    }
   };
   btn.addEventListener('touchstart', start, { passive: false });
   btn.addEventListener('touchend', end, { passive: false });
@@ -362,6 +376,9 @@ window.addEventListener('keydown', (e) => {
     e.preventDefault();
   }
   if (e.shiftKey || e.code === 'ShiftLeft' || e.code === 'ShiftRight') keys.run = true;
+  if (e.code === 'KeyE' || e.code === 'Enter') {
+    storyMaster.interactApartment(player);
+  }
 });
 
 window.addEventListener('keyup', (e) => {
@@ -376,29 +393,28 @@ window.addEventListener('pointerdown', () => sound.init(), { once: true });
 // Initialize Admin System
 initAdmin(
   assets,
+  bitManager,
+  storyMaster,
   (assetKey, dataUrl) => {
     if (assetKey === 'idle') {
       const avatar = document.getElementById('dialogue-avatar');
       if (avatar) avatar.src = dataUrl;
     }
   },
-  (speaker, text) => {
+  (testId, speaker, text) => {
     cinematic.show();
-    dialogue.show({ speaker, text, duration: 6000 });
+    dialogue.show({ id: testId, speaker, text, duration: 6000 });
   }
 );
 
-// Launch Story Opening Dialogue & Cinematic Bars
-dialogue.show({
-  speaker: 'Narrátor',
-  text: 'E Játék egy bizonyos karakterrel kezdődik. Az ő neve zsombor , akinek egyetlen célja hogy eljusson a gépéhez és streamelni kezdjen.',
-  duration: 10000
-});
+// Start Initial Story: "Találd meg a tatai albérleted"
+storyMaster.start();
 
 // Main game loop
 let lastTime = performance.now();
 
 function gameLoop(timestamp) {
+  const now = timestamp / 1000;
   const dt = Math.min((timestamp - lastTime) / 1000, 0.1);
   lastTime = timestamp;
 
@@ -411,10 +427,14 @@ function gameLoop(timestamp) {
 
   // Update logic
   player.update(dt);
+  bitManager.update(dt, player, now);
+  storyMaster.update(dt, now);
   cinematic.update(dt);
 
   // Render Scene
   drawBackground(ctx);
+  storyMaster.drawApartment(ctx, camera.x, player);
+  bitManager.draw(ctx, camera.x, now);
   updateAndDrawParticles(ctx, dt);
   player.draw(ctx);
 

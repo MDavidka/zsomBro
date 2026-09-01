@@ -1,20 +1,38 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="hu">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-  <title>ZsomBro</title>
-  <link rel="stylesheet" href="style.css?v=1788280732" />
+  <title>ZsomBro - Találd meg a tatai albérleted</title>
+  <link rel="stylesheet" href="style.css?v=1788282100" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
 </head>
 <body>
-  <!-- Layer 0: Game Canvas (Direct WebGL/2D Pixel Layer) -->
+  <!-- Layer 0: Game Canvas (Direct 2D Pixel Layer) -->
   <canvas id="gameCanvas"></canvas>
 
   <!-- Layer 1: Floating UI & Dialogue Overlay -->
   <div id="ui-layer">
+    <!-- Top Left: Quest / Task Tracker HUD -->
+    <div id="task-hud" class="retro-box">
+      <div class="task-hud-header">
+        <span class="task-icon">📜</span>
+        <span id="task-story-title">Találd meg a tatai albérleted</span>
+      </div>
+      <div class="task-hud-body">
+        <span class="task-arrow">▶</span>
+        <span id="task-description">Indulj el Tatán és keresd az albérletet!</span>
+      </div>
+    </div>
+
+    <!-- Top Center-Right: Bits Collectible Counter HUD -->
+    <div id="bits-hud" class="retro-box">
+      <img id="bits-hud-icon" src="assets/bit.png" alt="Bit" />
+      <span class="bits-text">BITS: <strong id="bit-count">0</strong>/<span id="bit-total">5</span></span>
+    </div>
+
     <!-- Admin Settings Gear -->
     <button id="admin-toggle-btn" class="icon-btn" title="Admin Settings">⚙️</button>
 
@@ -26,6 +44,7 @@
           <img id="dialogue-avatar" src="assets/zsomborr.png" alt="Avatar" class="hidden" />
         </div>
         <div id="dialogue-speaker">Narrátor</div>
+        <div id="dialogue-id-badge">#tata_intro_1</div>
         <div id="dialogue-text-container">
           <p id="dialogue-text"></p>
         </div>
@@ -50,50 +69,97 @@
   <div id="admin-modal" class="modal hidden">
     <div class="modal-content">
       <div class="modal-header">
-        <h2>🛠️ ADMIN ASSET MANAGER</h2>
+        <h2>🛠️ ZSOMBRO MASTER CONTROL</h2>
         <button id="admin-close-btn" class="close-btn">&times;</button>
       </div>
+
+      <!-- Navigation Tabs -->
+      <div class="admin-tabs">
+        <button class="tab-btn active" data-tab="tab-assets">🎨 Assets</button>
+        <button class="tab-btn" data-tab="tab-audio">🎙️ Audio Master</button>
+        <button class="tab-btn" data-tab="tab-story">📜 Story Master</button>
+      </div>
+
       <div class="modal-body">
-        <div class="asset-grid">
-          <div class="asset-card">
-            <label>🌄 Background Image</label>
-            <input type="file" id="upload-background" accept="image/*" />
-          </div>
-          <div class="asset-card">
-            <label>💬 Dialogue Box Frame</label>
-            <input type="file" id="upload-dialogue" accept="image/*" />
-          </div>
-          <div class="asset-card">
-            <label>🧍 Character (Idle)</label>
-            <input type="file" id="upload-idle" accept="image/*" />
-          </div>
-          <div class="asset-card">
-            <label>🚶 Walk 1</label>
-            <input type="file" id="upload-walk1" accept="image/*" />
-          </div>
-          <div class="asset-card">
-            <label>🚶 Walk 2</label>
-            <input type="file" id="upload-walk2" accept="image/*" />
-          </div>
-          <div class="asset-card">
-            <label>🏃 Run 1</label>
-            <input type="file" id="upload-run1" accept="image/*" />
+        <!-- Tab 1: Asset Manager -->
+        <div id="tab-assets" class="tab-pane active">
+          <div class="asset-grid">
+            <div class="asset-card">
+              <label>🌄 Background Image</label>
+              <input type="file" id="upload-background" accept="image/*" />
+            </div>
+            <div class="asset-card">
+              <label>💎 Collectible Bit (Crystal)</label>
+              <input type="file" id="upload-bit" accept="image/*" />
+            </div>
+            <div class="asset-card">
+              <label>💬 Dialogue Box Frame</label>
+              <input type="file" id="upload-dialogue" accept="image/*" />
+            </div>
+            <div class="asset-card">
+              <label>🧍 Character (Idle)</label>
+              <input type="file" id="upload-idle" accept="image/*" />
+            </div>
+            <div class="asset-card">
+              <label>🚶 Walk 1</label>
+              <input type="file" id="upload-walk1" accept="image/*" />
+            </div>
+            <div class="asset-card">
+              <label>🚶 Walk 2</label>
+              <input type="file" id="upload-walk2" accept="image/*" />
+            </div>
+            <div class="asset-card">
+              <label>🏃 Run 1</label>
+              <input type="file" id="upload-run1" accept="image/*" />
+            </div>
           </div>
         </div>
 
-        <div class="dialogue-tester">
-          <label>💬 Test Custom Dialogue</label>
-          <input type="text" id="test-speaker" placeholder="Speaker Name (e.g. Zsombor)" value="Zsombor" />
-          <textarea id="test-message" placeholder="Type test message here...">Gyerünk, kezdődjön a stream!</textarea>
-          <button id="test-dialogue-btn" class="retro-btn">Trigger Dialogue</button>
+        <!-- Tab 2: Audio Master -->
+        <div id="tab-audio" class="tab-pane">
+          <div class="audio-master-section">
+            <div class="volume-controls-bar">
+              <div class="vol-control">
+                <label>🔊 Fő hangerő (Master)</label>
+                <input type="range" id="vol-master" min="0" max="1" step="0.05" value="1.0" />
+              </div>
+              <div class="vol-control">
+                <label>🎙️ Hang / Szinkron (Voice)</label>
+                <input type="range" id="vol-voice" min="0" max="1" step="0.05" value="1.0" />
+              </div>
+            </div>
+
+            <h3 class="section-title">🎙️ Dialógus Hangok (MP3 Feltöltés / Kezelés)</h3>
+            <p class="section-desc">Minden képernyőn megjelenő dialógus rendelkezik egy egyedi <code>dialogueId</code>-val. Tölts fel hozzá MP3 szinkront, ami automatikusan lejátszódik a dialógus megjelenésekor!</p>
+
+            <div id="audio-master-list" class="audio-list-container">
+              <!-- Dynamically populated -->
+            </div>
+
+            <div class="dialogue-tester">
+              <label>💬 Egyedi Dialógus & Hang Tesztelése</label>
+              <input type="text" id="test-dialogue-id" placeholder="Dialógus ID (pl. custom_stream_start)" value="custom_stream_start" />
+              <input type="text" id="test-speaker" placeholder="Beszélő Neve (pl. Zsombor)" value="Zsombor" />
+              <textarea id="test-message" placeholder="Írd be a dialógus szövegét...">Gyerünk srácok, elindult a tatai albérletből a stream!</textarea>
+              <button id="test-dialogue-btn" class="retro-btn">💬 Dialógus Megjelenítése & Lejátszása</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 3: Story Master -->
+        <div id="tab-story" class="tab-pane">
+          <div id="story-master-info" class="story-master-section">
+            <!-- Dynamically populated with story stages and task progress -->
+          </div>
         </div>
       </div>
+
       <div class="modal-footer">
-        <button id="reset-assets-btn" class="retro-btn danger-btn">Reset to Default Assets</button>
+        <button id="reset-assets-btn" class="retro-btn danger-btn">Alapértelmezett Beállítások Visszaállítása</button>
       </div>
     </div>
   </div>
 
-  <script type="module" src="src/game.js?v=1788280732"></script>
+  <script type="module" src="src/game.js?v=1788282100"></script>
 </body>
 </html>
