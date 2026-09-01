@@ -4,7 +4,7 @@ class SoundSystem {
   constructor() {
     this.ctx = null;
     this.muted = false;
-    this.musicEnabled = true;
+    this.musicEnabled = false;
     this.musicInterval = null;
     this.musicStep = 0;
   }

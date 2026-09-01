@@ -1,33 +1,73 @@
-// Audio Master - Voice Over & Dialogue Audio Engine with IndexedDB & LocalStorage persistence
+// Audio Master - Voice Over & Global Audio / BGM Engine with IndexedDB & LocalStorage persistence
 
 const DB_NAME = 'ZsomBroAudioDB';
-const DB_VERSION = 2;
-const STORE_NAME = 'dialogue_voices';
+const DB_VERSION = 3;
+const STORE_VOICES = 'dialogue_voices';
+const STORE_GLOBAL = 'global_settings';
 
 class AudioMasterSystem {
   constructor() {
     this.db = null;
-    this.currentAudio = null;
-    this.previewAudio = null;
+    this.currentVoiceAudio = null;
+    this.globalAudio = null;
+    this.globalAudioData = null; // { objectUrl, dataUrl, name, size, duration, type, updatedAt }
+    this.isGlobalAudioPlaying = false;
+    this.globalAudioEnabled = localStorage.getItem('zsombro_global_audio_enabled') !== 'false';
+    this.globalAudioLoop = localStorage.getItem('zsombro_global_audio_loop') !== 'false';
+
     this.voicesCache = new Map(); // dialogueId -> { blob, objectUrl, dataUrl, name, size, duration, type, updatedAt }
     
     // Volume controls (persisted in localStorage)
     this.masterVolume = parseFloat(localStorage.getItem('zsombro_vol_master') || '1.0');
+    this.bgmVolume = parseFloat(localStorage.getItem('zsombro_vol_bgm') || '0.7');
     this.voiceVolume = parseFloat(localStorage.getItem('zsombro_vol_voice') || '1.0');
-    this.sfxVolume = parseFloat(localStorage.getItem('zsombro_vol_sfx') || '0.8');
-    this.bgmVolume = parseFloat(localStorage.getItem('zsombro_vol_bgm') || '0.6');
 
     // Dialogue Registry: catalogue of all known dialogue IDs in the game
     this.dialogueRegistry = new Map();
     this.listeners = new Set();
+    this.userInteracted = false;
 
     // Load localStorage backups first for instant availability
     this.loadFromLocalStorage();
     this.dbReady = this.initDB();
+    this.setupInteractionUnlock();
+  }
+
+  setupInteractionUnlock() {
+    const unlock = () => {
+      this.userInteracted = true;
+      if (this.globalAudio && this.globalAudioEnabled && this.globalAudio.paused) {
+        this.playGlobalAudio();
+      }
+    };
+    window.addEventListener('pointerdown', unlock, { once: true });
+    window.addEventListener('keydown', unlock, { once: true });
+    window.addEventListener('touchstart', unlock, { once: true });
   }
 
   loadFromLocalStorage() {
     try {
+      // 1. Load Global Audio
+      const globalDataUrl = localStorage.getItem('zsombro_global_audio_data');
+      const globalMetaStr = localStorage.getItem('zsombro_global_audio_meta');
+      if (globalDataUrl) {
+        let meta = {};
+        if (globalMetaStr) {
+          try { meta = JSON.parse(globalMetaStr); } catch (e) {}
+        }
+        this.globalAudioData = {
+          objectUrl: globalDataUrl,
+          dataUrl: globalDataUrl,
+          name: meta.name || 'global_music.mp3',
+          size: meta.size || Math.round(globalDataUrl.length * 0.75),
+          duration: meta.duration || 0,
+          type: meta.type || 'audio/mp3',
+          updatedAt: meta.updatedAt || Date.now()
+        };
+        this.initGlobalAudioElement();
+      }
+
+      // 2. Load Dialogues
       for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
         if (key && key.startsWith('zsombro_voice_data_')) {
@@ -52,7 +92,7 @@ class AudioMasterSystem {
         }
       }
     } catch (e) {
-      console.warn('Could not load voices from localStorage', e);
+      console.warn('Could not load audio from localStorage', e);
     }
   }
 
@@ -66,13 +106,16 @@ class AudioMasterSystem {
       const request = indexedDB.open(DB_NAME, DB_VERSION);
       request.onupgradeneeded = (e) => {
         const db = e.target.result;
-        if (!db.objectStoreNames.contains(STORE_NAME)) {
-          db.createObjectStore(STORE_NAME, { keyPath: 'dialogueId' });
+        if (!db.objectStoreNames.contains(STORE_VOICES)) {
+          db.createObjectStore(STORE_VOICES, { keyPath: 'dialogueId' });
+        }
+        if (!db.objectStoreNames.contains(STORE_GLOBAL)) {
+          db.createObjectStore(STORE_GLOBAL, { keyPath: 'key' });
         }
       };
       request.onsuccess = async (e) => {
         this.db = e.target.result;
-        await this.loadAllVoicesFromDB();
+        await this.loadAllFromDB();
         resolve(this.db);
       };
       request.onerror = (err) => {
@@ -82,15 +125,41 @@ class AudioMasterSystem {
     });
   }
 
-  async loadAllVoicesFromDB() {
+  async loadAllFromDB() {
     if (!this.db) return;
     return new Promise((resolve) => {
       try {
-        const tx = this.db.transaction(STORE_NAME, 'readonly');
-        const store = tx.objectStore(STORE_NAME);
-        const req = store.getAll();
-        req.onsuccess = () => {
-          const records = req.result || [];
+        const tx = this.db.transaction([STORE_VOICES, STORE_GLOBAL], 'readonly');
+        
+        // Load Global Audio from DB
+        const globalStore = tx.objectStore(STORE_GLOBAL);
+        const globalReq = globalStore.get('global_bgm');
+        globalReq.onsuccess = () => {
+          const rec = globalReq.result;
+          if (rec && (rec.blob || rec.dataUrl)) {
+            let url = rec.dataUrl;
+            if (rec.blob) {
+              url = URL.createObjectURL(rec.blob);
+            }
+            this.globalAudioData = {
+              blob: rec.blob,
+              objectUrl: url,
+              dataUrl: rec.dataUrl,
+              name: rec.name || 'global_music.mp3',
+              size: rec.size || (rec.blob ? rec.blob.size : 0),
+              duration: rec.duration || 0,
+              type: rec.type || 'audio/mp3',
+              updatedAt: rec.updatedAt || Date.now()
+            };
+            this.initGlobalAudioElement();
+          }
+        };
+
+        // Load Voices
+        const voiceStore = tx.objectStore(STORE_VOICES);
+        const voiceReq = voiceStore.getAll();
+        voiceReq.onsuccess = () => {
+          const records = voiceReq.result || [];
           records.forEach((rec) => {
             if (rec && rec.dialogueId && (rec.blob || rec.dataUrl)) {
               let url = rec.dataUrl;
@@ -109,16 +178,247 @@ class AudioMasterSystem {
               });
             }
           });
+        };
+
+        tx.oncomplete = () => {
           this.notifyChange();
           resolve();
         };
-        req.onerror = () => resolve();
+        tx.onerror = () => resolve();
       } catch (err) {
         console.warn('Failed to read from IndexedDB', err);
         resolve();
       }
     });
   }
+
+  // ==========================================
+  // GLOBAL AUDIO / BGM METHODS
+  // ==========================================
+
+  initGlobalAudioElement() {
+    if (!this.globalAudioData) return;
+    const src = this.globalAudioData.objectUrl || this.globalAudioData.dataUrl;
+    if (!src) return;
+
+    if (!this.globalAudio) {
+      this.globalAudio = new Audio();
+    }
+    
+    if (this.globalAudio.src !== src) {
+      this.globalAudio.src = src;
+      this.globalAudio.loop = this.globalAudioLoop;
+      this.updateGlobalAudioVolume();
+
+      this.globalAudio.onplay = () => {
+        this.isGlobalAudioPlaying = true;
+        this.notifyChange();
+      };
+      this.globalAudio.onpause = () => {
+        this.isGlobalAudioPlaying = false;
+        this.notifyChange();
+      };
+      this.globalAudio.onended = () => {
+        if (!this.globalAudioLoop) {
+          this.isGlobalAudioPlaying = false;
+          this.notifyChange();
+        }
+      };
+
+      if (this.globalAudioEnabled) {
+        this.playGlobalAudio();
+      }
+    }
+  }
+
+  async saveGlobalAudio(fileOrBlob, fileName = '') {
+    await this.dbReady;
+    const blob = fileOrBlob;
+    const name = fileName || fileOrBlob.name || 'global_music.mp3';
+
+    const dataUrl = await new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => resolve(e.target.result);
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(blob);
+    });
+
+    let duration = 0;
+    if (dataUrl) {
+      try {
+        duration = await new Promise((resolve) => {
+          const tempAudio = new Audio();
+          tempAudio.src = dataUrl;
+          tempAudio.onloadedmetadata = () => resolve(tempAudio.duration);
+          tempAudio.onerror = () => resolve(0);
+        });
+      } catch (e) {}
+    }
+
+    const record = {
+      key: 'global_bgm',
+      blob,
+      dataUrl,
+      name,
+      size: blob.size,
+      duration: Math.round(duration * 10) / 10,
+      type: blob.type || 'audio/mp3',
+      updatedAt: Date.now()
+    };
+
+    this.globalAudioData = {
+      blob,
+      objectUrl: dataUrl || URL.createObjectURL(blob),
+      dataUrl,
+      name: record.name,
+      size: record.size,
+      duration: record.duration,
+      type: record.type,
+      updatedAt: record.updatedAt
+    };
+
+    if (dataUrl && dataUrl.length < 5 * 1024 * 1024) {
+      try {
+        localStorage.setItem('zsombro_global_audio_data', dataUrl);
+        localStorage.setItem('zsombro_global_audio_meta', JSON.stringify({
+          name: record.name,
+          size: record.size,
+          duration: record.duration,
+          type: record.type,
+          updatedAt: record.updatedAt
+        }));
+      } catch (err) {
+        console.warn('localStorage quota reached for global audio', err);
+      }
+    }
+
+    if (this.db) {
+      try {
+        const tx = this.db.transaction(STORE_GLOBAL, 'readwrite');
+        const store = tx.objectStore(STORE_GLOBAL);
+        store.put(record);
+      } catch (err) {
+        console.warn('Failed to persist global audio into IndexedDB', err);
+      }
+    }
+
+    this.initGlobalAudioElement();
+    if (this.globalAudioEnabled) {
+      this.playGlobalAudio();
+    }
+    this.notifyChange();
+    return true;
+  }
+
+  async deleteGlobalAudio() {
+    await this.dbReady;
+    if (this.globalAudio) {
+      this.globalAudio.pause();
+      this.globalAudio.src = '';
+      this.globalAudio = null;
+    }
+    if (this.globalAudioData && this.globalAudioData.objectUrl && this.globalAudioData.objectUrl.startsWith('blob:')) {
+      URL.revokeObjectURL(this.globalAudioData.objectUrl);
+    }
+    this.globalAudioData = null;
+    this.isGlobalAudioPlaying = false;
+
+    try {
+      localStorage.removeItem('zsombro_global_audio_data');
+      localStorage.removeItem('zsombro_global_audio_meta');
+    } catch (e) {}
+
+    if (this.db) {
+      try {
+        const tx = this.db.transaction(STORE_GLOBAL, 'readwrite');
+        const store = tx.objectStore(STORE_GLOBAL);
+        store.delete('global_bgm');
+      } catch (err) {
+        console.warn('Failed to delete global audio from IndexedDB', err);
+      }
+    }
+
+    this.notifyChange();
+  }
+
+  playGlobalAudio() {
+    if (!this.globalAudioData) return false;
+    if (!this.globalAudio) {
+      this.initGlobalAudioElement();
+    }
+    if (!this.globalAudio) return false;
+
+    this.globalAudio.loop = this.globalAudioLoop;
+    this.updateGlobalAudioVolume();
+
+    const promise = this.globalAudio.play();
+    if (promise !== undefined) {
+      promise
+        .then(() => {
+          this.isGlobalAudioPlaying = true;
+          this.notifyChange();
+        })
+        .catch((err) => {
+          console.warn('Global audio autoplay wait for interaction:', err.message);
+        });
+    }
+    return true;
+  }
+
+  pauseGlobalAudio() {
+    if (this.globalAudio) {
+      this.globalAudio.pause();
+      this.isGlobalAudioPlaying = false;
+      this.notifyChange();
+    }
+  }
+
+  toggleGlobalAudioPlay() {
+    if (this.isGlobalAudioPlaying) {
+      this.pauseGlobalAudio();
+    } else {
+      this.playGlobalAudio();
+    }
+  }
+
+  setGlobalAudioEnabled(enabled) {
+    this.globalAudioEnabled = !!enabled;
+    localStorage.setItem('zsombro_global_audio_enabled', this.globalAudioEnabled ? 'true' : 'false');
+    if (this.globalAudioEnabled) {
+      this.playGlobalAudio();
+    } else {
+      this.pauseGlobalAudio();
+    }
+    this.notifyChange();
+  }
+
+  setGlobalAudioLoop(loop) {
+    this.globalAudioLoop = !!loop;
+    localStorage.setItem('zsombro_global_audio_loop', this.globalAudioLoop ? 'true' : 'false');
+    if (this.globalAudio) {
+      this.globalAudio.loop = this.globalAudioLoop;
+    }
+    this.notifyChange();
+  }
+
+  updateGlobalAudioVolume() {
+    if (this.globalAudio) {
+      const vol = Math.max(0, Math.min(1, this.masterVolume * this.bgmVolume));
+      this.globalAudio.volume = vol;
+    }
+  }
+
+  hasGlobalAudio() {
+    return !!(this.globalAudioData && (this.globalAudioData.objectUrl || this.globalAudioData.dataUrl));
+  }
+
+  getGlobalAudioInfo() {
+    return this.globalAudioData;
+  }
+
+  // ==========================================
+  // DIALOGUE VOICES METHODS
+  // ==========================================
 
   registerDialogue(id, info) {
     this.dialogueRegistry.set(id, {
@@ -148,7 +448,6 @@ class AudioMasterSystem {
     const blob = fileOrBlob;
     const name = fileName || fileOrBlob.name || `${dialogueId}.mp3`;
 
-    // Convert to DataURL for immediate playback and localStorage persistence
     const dataUrl = await new Promise((resolve) => {
       const reader = new FileReader();
       reader.onload = (e) => resolve(e.target.result);
@@ -156,7 +455,6 @@ class AudioMasterSystem {
       reader.readAsDataURL(blob);
     });
 
-    // Detect audio duration
     let duration = 0;
     if (dataUrl) {
       try {
@@ -180,7 +478,6 @@ class AudioMasterSystem {
       updatedAt: Date.now()
     };
 
-    // Save in cache
     this.voicesCache.set(dialogueId, {
       blob,
       objectUrl: dataUrl || URL.createObjectURL(blob),
@@ -192,7 +489,6 @@ class AudioMasterSystem {
       updatedAt: record.updatedAt
     });
 
-    // Save in localStorage if under 4MB
     if (dataUrl && dataUrl.length < 4 * 1024 * 1024) {
       try {
         localStorage.setItem('zsombro_voice_data_' + dialogueId, dataUrl);
@@ -208,11 +504,10 @@ class AudioMasterSystem {
       }
     }
 
-    // Save in IndexedDB
     if (this.db) {
       try {
-        const tx = this.db.transaction(STORE_NAME, 'readwrite');
-        const store = tx.objectStore(STORE_NAME);
+        const tx = this.db.transaction(STORE_VOICES, 'readwrite');
+        const store = tx.objectStore(STORE_VOICES);
         store.put(record);
       } catch (err) {
         console.warn('Failed to persist audio into IndexedDB', err);
@@ -238,8 +533,8 @@ class AudioMasterSystem {
 
     if (this.db) {
       try {
-        const tx = this.db.transaction(STORE_NAME, 'readwrite');
-        const store = tx.objectStore(STORE_NAME);
+        const tx = this.db.transaction(STORE_VOICES, 'readwrite');
+        const store = tx.objectStore(STORE_VOICES);
         store.delete(dialogueId);
       } catch (err) {
         console.warn('Failed to delete audio from IndexedDB', err);
@@ -264,16 +559,16 @@ class AudioMasterSystem {
       audio.volume = effectiveVolume;
 
       audio.onended = () => {
-        if (this.currentAudio === audio) {
-          this.currentAudio = null;
+        if (this.currentVoiceAudio === audio) {
+          this.currentVoiceAudio = null;
         }
         if (onEnded) onEnded();
       };
 
       audio.onerror = (e) => {
         console.warn('Audio playback error for dialogue ID:', dialogueId, e);
-        if (this.currentAudio === audio) {
-          this.currentAudio = null;
+        if (this.currentVoiceAudio === audio) {
+          this.currentVoiceAudio = null;
         }
       };
 
@@ -284,7 +579,7 @@ class AudioMasterSystem {
         });
       }
 
-      this.currentAudio = audio;
+      this.currentVoiceAudio = audio;
       return true;
     } catch (e) {
       console.warn('Could not play audio', e);
@@ -293,60 +588,40 @@ class AudioMasterSystem {
   }
 
   stopVoice() {
-    if (this.currentAudio) {
+    if (this.currentVoiceAudio) {
       try {
-        this.currentAudio.pause();
-        this.currentAudio.currentTime = 0;
+        this.currentVoiceAudio.pause();
+        this.currentVoiceAudio.currentTime = 0;
       } catch (e) {}
-      this.currentAudio = null;
+      this.currentVoiceAudio = null;
     }
   }
 
-  playPreview(dialogueId) {
-    this.stopPreview();
-    const item = this.voicesCache.get(dialogueId);
-    if (!item || (!item.objectUrl && !item.dataUrl)) return false;
-
-    const audioSrc = item.objectUrl || item.dataUrl;
-
-    try {
-      const audio = new Audio(audioSrc);
-      audio.volume = Math.max(0, Math.min(1, this.masterVolume * this.voiceVolume));
-      audio.onended = () => {
-        if (this.previewAudio === audio) this.previewAudio = null;
-        this.notifyChange();
-      };
-      this.previewAudio = audio;
-      audio.play().catch(console.warn);
-      this.notifyChange();
-      return true;
-    } catch (err) {
-      console.warn('Preview error', err);
-      return false;
-    }
-  }
-
-  stopPreview() {
-    if (this.previewAudio) {
-      try {
-        this.previewAudio.pause();
-        this.previewAudio.currentTime = 0;
-      } catch (e) {}
-      this.previewAudio = null;
-      this.notifyChange();
-    }
-  }
+  // ==========================================
+  // VOLUME SETTINGS
+  // ==========================================
 
   setMasterVolume(val) {
     this.masterVolume = Math.max(0, Math.min(1, val));
     localStorage.setItem('zsombro_vol_master', this.masterVolume);
-    if (this.currentAudio) this.currentAudio.volume = this.masterVolume * this.voiceVolume;
+    this.updateGlobalAudioVolume();
+    if (this.currentVoiceAudio) {
+      this.currentVoiceAudio.volume = this.masterVolume * this.voiceVolume;
+    }
+  }
+
+  setBgmVolume(val) {
+    this.bgmVolume = Math.max(0, Math.min(1, val));
+    localStorage.setItem('zsombro_vol_bgm', this.bgmVolume);
+    this.updateGlobalAudioVolume();
   }
 
   setVoiceVolume(val) {
     this.voiceVolume = Math.max(0, Math.min(1, val));
     localStorage.setItem('zsombro_vol_voice', this.voiceVolume);
-    if (this.currentAudio) this.currentAudio.volume = this.masterVolume * this.voiceVolume;
+    if (this.currentVoiceAudio) {
+      this.currentVoiceAudio.volume = this.masterVolume * this.voiceVolume;
+    }
   }
 
   onChange(cb) {

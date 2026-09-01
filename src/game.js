@@ -115,7 +115,6 @@ const player = {
     if (this.isGrounded) {
       this.vy = this.jumpStrength;
       this.isGrounded = false;
-      sound.playShoot();
       createDust(this.x, this.y, 7);
     }
   },
@@ -154,7 +153,6 @@ const player = {
     if (this.y >= GROUND_Y) {
       if (!this.isGrounded && this.vy > 2) {
         createDust(this.x, GROUND_Y, 8);
-        sound.playHit();
       }
       this.y = GROUND_Y;
       this.vy = 0;
@@ -388,7 +386,12 @@ window.addEventListener('keyup', (e) => {
   if (!e.shiftKey && (e.code === 'ShiftLeft' || e.code === 'ShiftRight')) keys.run = false;
 });
 
-window.addEventListener('pointerdown', () => sound.init(), { once: true });
+window.addEventListener('pointerdown', () => {
+  sound.init();
+  if (audioMaster.globalAudioEnabled && !audioMaster.isGlobalAudioPlaying) {
+    audioMaster.playGlobalAudio();
+  }
+}, { once: true });
 
 // Initialize Admin System
 initAdmin(

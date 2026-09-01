@@ -114,11 +114,6 @@ class DialogueSystem {
       if (this.typewriterIndex < this.targetText.length) {
         this.currentText += this.targetText[this.typewriterIndex];
         if (this.textElem) this.textElem.textContent = this.currentText;
-        
-        if (!hasVoiceAudio && this.typewriterIndex % 2 === 0 && this.targetText[this.typewriterIndex] !== ' ') {
-          sound.playTone(430 + (this.typewriterIndex % 4) * 35, 'square', 0.035, 0.04);
-        }
-        
         this.typewriterIndex++;
       } else {
         this.finishTyping(duration);
@@ -204,7 +199,10 @@ export function initAdmin(assets, bitManager, storyMaster, onAssetUpdated, onTri
       }
     });
 
-    if (targetId === 'tab-audio') renderAudioMasterList();
+    if (targetId === 'tab-audio') {
+      renderGlobalAudioBox();
+      renderAudioMasterList();
+    }
     if (targetId === 'tab-story') renderStoryMasterView();
   };
 
@@ -231,13 +229,14 @@ export function initAdmin(assets, bitManager, storyMaster, onAssetUpdated, onTri
   // Modal open / close
   toggleBtn?.addEventListener('click', () => {
     modal?.classList.remove('hidden');
+    renderGlobalAudioBox();
     renderAudioMasterList();
     renderStoryMasterView();
   });
 
   closeBtn?.addEventListener('click', () => {
     modal?.classList.add('hidden');
-    audioMaster.stopPreview();
+    audioMaster.stopVoice();
   });
 
   // Assets Uploaders
@@ -295,6 +294,126 @@ export function initAdmin(assets, bitManager, storyMaster, onAssetUpdated, onTri
     if (onTriggerDialogue) onTriggerDialogue(testId, speaker, text);
   });
 
+  // Global Audio / BGM Box Renderer
+  function renderGlobalAudioBox() {
+    const box = document.getElementById('global-audio-box');
+    if (!box) return;
+
+    const hasGlobal = audioMaster.hasGlobalAudio();
+    const globalInfo = audioMaster.getGlobalAudioInfo();
+    const isPlaying = audioMaster.isGlobalAudioPlaying;
+    const isEnabled = audioMaster.globalAudioEnabled;
+    const isLoop = audioMaster.globalAudioLoop;
+
+    const durStr = globalInfo && globalInfo.duration ? ` • ${globalInfo.duration}s` : '';
+    const sizeStr = globalInfo && globalInfo.size ? ` • ${(globalInfo.size / 1024).toFixed(1)} KB` : '';
+
+    let statusText = '📁 NINCS GLOBÁLIS AUDIO BEÁLLÍTVA';
+    let statusClass = 'no-voice';
+
+    if (hasGlobal) {
+      if (!isEnabled) {
+        statusText = '🔇 NÉMÍTVA / KIKAPCSOLVA';
+        statusClass = 'disabled-voice';
+      } else if (isPlaying) {
+        statusText = '🟢 AKTÍV ÉS LEJÁTSZÓDIK A JÁTÉKBAN';
+        statusClass = 'has-voice';
+      } else {
+        statusText = '⏸️ SZÜNETELTETVE (Interakcióra vár vagy leállítva)';
+        statusClass = 'has-voice';
+      }
+    }
+
+    box.innerHTML = `
+      <div class="global-audio-header">
+        <span class="global-audio-title">🎵 GLOBÁLIS HÁTTÉRZENE / AUDIO (Mentve & Használva)</span>
+        <span class="voice-badge ${statusClass}">${statusText}</span>
+      </div>
+
+      <p class="section-desc">
+        Itt tölthetsz fel valódi MP3/WAV zenét, ami <strong>globálisan mentésre kerül</strong> a böngésződben (IndexedDB + LocalStorage) és a játék teljes ideje alatt szól háttérzeneként.
+      </p>
+
+      ${hasGlobal ? `
+        <div class="global-audio-details">
+          <div class="audio-player-wrapper">
+            <audio controls class="real-audio-player" src="${globalInfo.objectUrl || globalInfo.dataUrl}"></audio>
+            <span class="audio-file-meta">Fájlnév: <strong>${globalInfo.name || 'global_music.mp3'}</strong>${durStr}${sizeStr}</span>
+          </div>
+
+          <div class="global-audio-controls-row">
+            <button type="button" id="btn-toggle-global-play" class="retro-btn ${isPlaying ? 'pause-btn' : 'play-btn'}">
+              ${isPlaying ? '⏸️ Szüneteltetés' : '▶️ Lejátszás Most'}
+            </button>
+            <label class="checkbox-label">
+              <input type="checkbox" id="chk-global-enabled" ${isEnabled ? 'checked' : ''} />
+              <span>🔊 Zene bekapcsolva a játékban</span>
+            </label>
+            <label class="checkbox-label">
+              <input type="checkbox" id="chk-global-loop" ${isLoop ? 'checked' : ''} />
+              <span>🔁 Végtelen ismétlés (Loop)</span>
+            </label>
+          </div>
+        </div>
+      ` : ''}
+
+      <div class="global-upload-row">
+        <label for="upload-global-audio-file" class="file-label">
+          ${hasGlobal ? '🔄 Új Globális Audio Feltöltése & Csere:' : '📁 Globális MP3 Hangfájl Feltöltése:'}
+        </label>
+        <input type="file" id="upload-global-audio-file" accept="audio/*,.mp3,.wav,.ogg,.m4a" class="retro-file-input" />
+      </div>
+      <div id="global-upload-status" class="upload-status-msg"></div>
+
+      ${hasGlobal ? `
+        <div class="global-audio-footer-actions">
+          <button type="button" id="btn-delete-global-audio" class="delete-voice-btn danger-btn retro-btn">
+            🗑 Globális Audio Törlése & Némítás
+          </button>
+        </div>
+      ` : ''}
+    `;
+
+    // Event listeners
+    const fileInput = box.querySelector('#upload-global-audio-file');
+    const statusElem = box.querySelector('#global-upload-status');
+    fileInput?.addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        if (statusElem) {
+          statusElem.textContent = `⏳ Feltöltés és mentés: ${file.name}...`;
+          statusElem.className = 'upload-status-msg loading';
+        }
+        await audioMaster.saveGlobalAudio(file, file.name);
+        if (statusElem) {
+          statusElem.textContent = `✅ Globális audio sikeresen elmentve: ${file.name}!`;
+          statusElem.className = 'upload-status-msg success';
+        }
+        renderGlobalAudioBox();
+      }
+    });
+
+    box.querySelector('#btn-toggle-global-play')?.addEventListener('click', () => {
+      audioMaster.toggleGlobalAudioPlay();
+      renderGlobalAudioBox();
+    });
+
+    box.querySelector('#chk-global-enabled')?.addEventListener('change', (e) => {
+      audioMaster.setGlobalAudioEnabled(e.target.checked);
+      renderGlobalAudioBox();
+    });
+
+    box.querySelector('#chk-global-loop')?.addEventListener('change', (e) => {
+      audioMaster.setGlobalAudioLoop(e.target.checked);
+      renderGlobalAudioBox();
+    });
+
+    box.querySelector('#btn-delete-global-audio')?.addEventListener('click', async () => {
+      await audioMaster.deleteGlobalAudio();
+      renderGlobalAudioBox();
+    });
+  }
+
   // Audio Master List Renderer with Direct MP3 Upload & Audio Controls
   function renderAudioMasterList() {
     const container = document.getElementById('audio-master-list');
@@ -312,7 +431,7 @@ export function initAdmin(assets, bitManager, storyMaster, onAssetUpdated, onTri
     const quickUploadBox = document.createElement('div');
     quickUploadBox.className = 'quick-voice-box';
     quickUploadBox.innerHTML = `
-      <div class="quick-voice-header">⚡ GYORS MP3 FELTÖLTÉS</div>
+      <div class="quick-voice-header">⚡ GYORS SZINKRON MP3 FELTÖLTÉS</div>
       <div class="quick-voice-row">
         <label for="quick-dialogue-select">Válassz Dialógust:</label>
         <select id="quick-dialogue-select" class="retro-select">
@@ -360,7 +479,7 @@ export function initAdmin(assets, bitManager, storyMaster, onAssetUpdated, onTri
         <div class="audio-item-header">
           <span class="dialogue-id-tag">ID: <strong>${dlg.id}</strong></span>
           <span class="voice-badge ${hasVoice ? 'has-voice' : 'no-voice'}">
-            ${hasVoice ? `✅ MP3 HANG BETÖLTVE${durStr}` : '🔇 8-BIT SZINTETIZÁLT'}
+            ${hasVoice ? `✅ MP3 SZINKRON BETÖLTVE${durStr}` : '🔇 SZÖVEGES / NÉMA'}
           </span>
         </div>
         <div class="audio-dialogue-preview">
@@ -419,10 +538,15 @@ export function initAdmin(assets, bitManager, storyMaster, onAssetUpdated, onTri
 
   // Volume Sliders
   const masterVol = document.getElementById('vol-master');
+  const bgmVol = document.getElementById('vol-bgm');
   const voiceVol = document.getElementById('vol-voice');
   if (masterVol) {
     masterVol.value = audioMaster.masterVolume;
     masterVol.addEventListener('input', (e) => audioMaster.setMasterVolume(parseFloat(e.target.value)));
+  }
+  if (bgmVol) {
+    bgmVol.value = audioMaster.bgmVolume;
+    bgmVol.addEventListener('input', (e) => audioMaster.setBgmVolume(parseFloat(e.target.value)));
   }
   if (voiceVol) {
     voiceVol.value = audioMaster.voiceVolume;
@@ -465,6 +589,7 @@ export function initAdmin(assets, bitManager, storyMaster, onAssetUpdated, onTri
   // Update audio master list whenever audioMaster changes
   audioMaster.onChange(() => {
     if (modal && !modal.classList.contains('hidden')) {
+      renderGlobalAudioBox();
       renderAudioMasterList();
     }
   });
@@ -473,6 +598,7 @@ export function initAdmin(assets, bitManager, storyMaster, onAssetUpdated, onTri
     if (e.key === '`' || e.key === '~' || e.key === 'F2') {
       modal?.classList.toggle('hidden');
       if (!modal.classList.contains('hidden')) {
+        renderGlobalAudioBox();
         renderAudioMasterList();
         renderStoryMasterView();
       }

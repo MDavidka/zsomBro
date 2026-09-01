@@ -85,7 +85,6 @@ export class BitManager {
       if (pRight >= bLeft && pLeft <= bRight && pBottom >= bTop && pTop <= bBottom) {
         bit.collected = true;
         this.collectedCount++;
-        this.sound?.playGem();
         this.spawnCollectionBurst(bit.x, bobY);
         this.updateHUD();
 

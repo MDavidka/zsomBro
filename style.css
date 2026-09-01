@@ -589,6 +589,102 @@ html, body {
   border-radius: 3px;
 }
 
+/* Global Audio Manager Card */
+.global-audio-card {
+  background: #0d1726;
+  border: 2px solid #58a6ff;
+  border-radius: 8px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.6), 0 0 12px rgba(88, 166, 255, 0.25);
+}
+
+.global-audio-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  border-bottom: 1px solid rgba(88, 166, 255, 0.3);
+  padding-bottom: 8px;
+}
+
+.global-audio-title {
+  font-size: 9px;
+  color: #79c0ff;
+  font-weight: bold;
+}
+
+.global-audio-details {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.global-audio-controls-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.global-audio-controls-row .play-btn {
+  background: #238636;
+  border-color: #2ea043;
+  color: #ffffff;
+}
+
+.global-audio-controls-row .play-btn:hover {
+  background: #2ea043;
+}
+
+.global-audio-controls-row .pause-btn {
+  background: #9e6a03;
+  border-color: #d29922;
+  color: #ffffff;
+}
+
+.global-audio-controls-row .pause-btn:hover {
+  background: #bb8009;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 7.5px;
+  color: #c9d1d9;
+  cursor: pointer;
+  user-select: none;
+}
+
+.checkbox-label input[type="checkbox"] {
+  accent-color: #58a6ff;
+  cursor: pointer;
+  width: 14px;
+  height: 14px;
+}
+
+.global-upload-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.global-audio-footer-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+
+.voice-badge.disabled-voice {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  border: 1px solid #ef4444;
+}
+
 /* Quick Voice Upload Box */
 .quick-voice-box {
   background: #111b27;
