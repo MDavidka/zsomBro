@@ -226,17 +226,32 @@ export function initAdmin(assets, bitManager, storyMaster, onAssetUpdated, onTri
     });
   });
 
+  // Global Modal Open / Close Helpers
+  window.openAdminModal = function() {
+    if (modal) {
+      modal.classList.remove('hidden');
+      renderGlobalAudioBox();
+      renderAudioMasterList();
+      renderStoryMasterView();
+    }
+  };
+
+  window.closeAdminModal = function() {
+    if (modal) {
+      modal.classList.add('hidden');
+      audioMaster.stopVoice();
+    }
+  };
+
   // Modal open / close
-  toggleBtn?.addEventListener('click', () => {
-    modal?.classList.remove('hidden');
-    renderGlobalAudioBox();
-    renderAudioMasterList();
-    renderStoryMasterView();
+  toggleBtn?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    window.openAdminModal();
   });
 
-  closeBtn?.addEventListener('click', () => {
-    modal?.classList.add('hidden');
-    audioMaster.stopVoice();
+  closeBtn?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    window.closeAdminModal();
   });
 
   // Assets Uploaders

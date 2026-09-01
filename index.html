@@ -34,7 +34,7 @@
     </div>
 
     <!-- Admin Settings Gear -->
-    <button id="admin-toggle-btn" class="icon-btn" title="Admin Settings">⚙️</button>
+    <button id="admin-toggle-btn" class="icon-btn" title="Admin Settings" onclick="if(window.openAdminModal){window.openAdminModal()}else{const m=document.getElementById('admin-modal');if(m)m.classList.remove('hidden');}">⚙️</button>
 
     <!-- Global Dialogue Box Overlay -->
     <div id="dialogue-container" class="hidden">
@@ -70,7 +70,7 @@
     <div class="modal-content">
       <div class="modal-header">
         <h2>🛠️ ZSOMBRO MASTER CONTROL</h2>
-        <button id="admin-close-btn" class="close-btn" type="button">&times;</button>
+        <button id="admin-close-btn" class="close-btn" type="button" onclick="if(window.closeAdminModal){window.closeAdminModal()}else{const m=document.getElementById('admin-modal');if(m)m.classList.add('hidden');}">&times;</button>
       </div>
 
       <!-- Navigation Tabs -->
