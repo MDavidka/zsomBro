@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <title>ZsomBro - Találd meg a tatai albérleted</title>
-  <link rel="stylesheet" href="style.css?v=1788282800" />
+  <link rel="stylesheet" href="style.css?v=1788283500" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
@@ -39,7 +39,7 @@
     <!-- Global Dialogue Box Overlay -->
     <div id="dialogue-container" class="hidden">
       <div id="dialogue-box">
-        <img id="dialogue-bg" src="assets/dialogue_box.png?v=1788282800" alt="Dialogue Frame" />
+        <img id="dialogue-bg" src="assets/dialogue_box.png?v=1788283500" alt="Dialogue Frame" />
         <div id="dialogue-avatar-container">
           <img id="dialogue-avatar" src="assets/zsomborr.png" alt="Avatar" class="hidden" />
         </div>
@@ -70,19 +70,19 @@
     <div class="modal-content">
       <div class="modal-header">
         <h2>🛠️ ZSOMBRO MASTER CONTROL</h2>
-        <button id="admin-close-btn" class="close-btn">&times;</button>
+        <button id="admin-close-btn" class="close-btn" type="button">&times;</button>
       </div>
 
       <!-- Navigation Tabs -->
       <div class="admin-tabs">
-        <button class="tab-btn active" data-tab="tab-assets">🎨 Assets</button>
-        <button class="tab-btn" data-tab="tab-audio">🎙️ Audio Master</button>
-        <button class="tab-btn" data-tab="tab-story">📜 Story Master</button>
+        <button type="button" class="tab-btn active" data-tab="tab-assets" onclick="if(window.switchAdminTab) window.switchAdminTab('tab-assets')">🎨 Assets</button>
+        <button type="button" class="tab-btn" data-tab="tab-audio" onclick="if(window.switchAdminTab) window.switchAdminTab('tab-audio')">🎙️ Audio Master</button>
+        <button type="button" class="tab-btn" data-tab="tab-story" onclick="if(window.switchAdminTab) window.switchAdminTab('tab-story')">📜 Story Master</button>
       </div>
 
       <div class="modal-body">
         <!-- Tab 1: Asset Manager -->
-        <div id="tab-assets" class="tab-pane active">
+        <div id="tab-assets" class="tab-pane active" style="display: block;">
           <div class="asset-grid">
             <div class="asset-card">
               <label>🌄 Background Image</label>
@@ -116,7 +116,7 @@
         </div>
 
         <!-- Tab 2: Audio Master -->
-        <div id="tab-audio" class="tab-pane">
+        <div id="tab-audio" class="tab-pane" style="display: none;">
           <div class="audio-master-section">
             <div class="volume-controls-bar">
               <div class="vol-control">
@@ -141,13 +141,13 @@
               <input type="text" id="test-dialogue-id" placeholder="Dialógus ID (pl. dialog_custom_1)" value="dialog_custom_1" />
               <input type="text" id="test-speaker" placeholder="Beszélő Neve (pl. Zsombor)" value="Zsombor" />
               <textarea id="test-message" placeholder="Írd be a dialógus szövegét...">Gyerünk srácok, elindult a tatai albérletből a stream!</textarea>
-              <button id="test-dialogue-btn" class="retro-btn">💬 Dialógus Megjelenítése & Lejátszása</button>
+              <button id="test-dialogue-btn" type="button" class="retro-btn">💬 Dialógus Megjelenítése & Lejátszása</button>
             </div>
           </div>
         </div>
 
         <!-- Tab 3: Story Master -->
-        <div id="tab-story" class="tab-pane">
+        <div id="tab-story" class="tab-pane" style="display: none;">
           <div id="story-master-info" class="story-master-section">
             <!-- Dynamically populated with story stages and task progress -->
           </div>
@@ -155,11 +155,11 @@
       </div>
 
       <div class="modal-footer">
-        <button id="reset-assets-btn" class="retro-btn danger-btn">Alapértelmezett Beállítások Visszaállítása</button>
+        <button id="reset-assets-btn" type="button" class="retro-btn danger-btn">Alapértelmezett Beállítások Visszaállítása</button>
       </div>
     </div>
   </div>
 
-  <script type="module" src="src/game.js?v=1788282800"></script>
+  <script type="module" src="src/game.js?v=1788283500"></script>
 </body>
 </html>

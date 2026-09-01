@@ -108,7 +108,6 @@ class DialogueSystem {
     this.clearTimers();
     this.isTyping = true;
 
-    // Smooth typing speed when real voice is playing
     const speed = hasVoiceAudio ? 28 : 36;
 
     this.typewriterInterval = setInterval(() => {
@@ -116,7 +115,6 @@ class DialogueSystem {
         this.currentText += this.targetText[this.typewriterIndex];
         if (this.textElem) this.textElem.textContent = this.currentText;
         
-        // If no MP3 voice audio is playing, emit 8-bit sound tones
         if (!hasVoiceAudio && this.typewriterIndex % 2 === 0 && this.targetText[this.typewriterIndex] !== ' ') {
           sound.playTone(430 + (this.typewriterIndex % 4) * 35, 'square', 0.035, 0.04);
         }
@@ -186,6 +184,50 @@ export function initAdmin(assets, bitManager, storyMaster, onAssetUpdated, onTri
   const resetBtn = document.getElementById('reset-assets-btn');
   const testBtn = document.getElementById('test-dialogue-btn');
 
+  // Global Tab Switcher Function
+  window.switchAdminTab = function(targetId) {
+    const tabBtns = document.querySelectorAll('.tab-btn');
+    const tabPanes = document.querySelectorAll('.tab-pane');
+
+    tabBtns.forEach(btn => {
+      const match = btn.getAttribute('data-tab') === targetId;
+      btn.classList.toggle('active', match);
+    });
+
+    tabPanes.forEach(pane => {
+      const match = pane.id === targetId;
+      pane.classList.toggle('active', match);
+      if (match) {
+        pane.style.display = 'block';
+      } else {
+        pane.style.display = 'none';
+      }
+    });
+
+    if (targetId === 'tab-audio') renderAudioMasterList();
+    if (targetId === 'tab-story') renderStoryMasterView();
+  };
+
+  // Attach tab switching events via container delegation and direct clicks
+  const tabsContainer = document.querySelector('.admin-tabs');
+  if (tabsContainer) {
+    tabsContainer.addEventListener('click', (e) => {
+      const btn = e.target.closest('.tab-btn');
+      if (btn) {
+        const tabId = btn.getAttribute('data-tab');
+        if (tabId) window.switchAdminTab(tabId);
+      }
+    });
+  }
+
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      const tabId = btn.getAttribute('data-tab');
+      if (tabId) window.switchAdminTab(tabId);
+    });
+  });
+
   // Modal open / close
   toggleBtn?.addEventListener('click', () => {
     modal?.classList.remove('hidden');
@@ -196,21 +238,6 @@ export function initAdmin(assets, bitManager, storyMaster, onAssetUpdated, onTri
   closeBtn?.addEventListener('click', () => {
     modal?.classList.add('hidden');
     audioMaster.stopPreview();
-  });
-
-  // Tab switching
-  const tabBtns = document.querySelectorAll('.tab-btn');
-  const tabPanes = document.querySelectorAll('.tab-pane');
-  tabBtns.forEach(btn => {
-    btn.addEventListener('click', () => {
-      tabBtns.forEach(b => b.classList.remove('active'));
-      tabPanes.forEach(p => p.classList.remove('active'));
-      btn.classList.add('active');
-      const targetId = btn.getAttribute('data-tab');
-      document.getElementById(targetId)?.classList.add('active');
-      if (targetId === 'tab-audio') renderAudioMasterList();
-      if (targetId === 'tab-story') renderStoryMasterView();
-    });
   });
 
   // Assets Uploaders
@@ -268,7 +295,7 @@ export function initAdmin(assets, bitManager, storyMaster, onAssetUpdated, onTri
     if (onTriggerDialogue) onTriggerDialogue(testId, speaker, text);
   });
 
-  // Audio Master List Renderer with Real MP3 Player Controls
+  // Audio Master List Renderer with Direct MP3 Upload & Audio Controls
   function renderAudioMasterList() {
     const container = document.getElementById('audio-master-list');
     if (!container) return;
@@ -280,6 +307,45 @@ export function initAdmin(assets, bitManager, storyMaster, onAssetUpdated, onTri
     }
 
     container.innerHTML = '';
+
+    // Quick Voice Upload Box for primary dialogues
+    const quickUploadBox = document.createElement('div');
+    quickUploadBox.className = 'quick-voice-box';
+    quickUploadBox.innerHTML = `
+      <div class="quick-voice-header">⚡ GYORS MP3 FELTÖLTÉS</div>
+      <div class="quick-voice-row">
+        <label for="quick-dialogue-select">Válassz Dialógust:</label>
+        <select id="quick-dialogue-select" class="retro-select">
+          ${dialogues.map(d => `<option value="${d.id}">#${d.id} (${d.speaker}): "${d.text.slice(0, 32)}..."</option>`).join('')}
+        </select>
+      </div>
+      <div class="quick-voice-row">
+        <label for="quick-mp3-file">MP3 / Hang Fájl:</label>
+        <input type="file" id="quick-mp3-file" accept="audio/*,.mp3,.wav,.ogg,.m4a" class="retro-file-input" />
+      </div>
+      <div id="quick-upload-status" class="upload-status-msg"></div>
+    `;
+
+    const quickFileInput = quickUploadBox.querySelector('#quick-mp3-file');
+    const quickSelect = quickUploadBox.querySelector('#quick-dialogue-select');
+    const quickStatus = quickUploadBox.querySelector('#quick-upload-status');
+
+    quickFileInput?.addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      const targetDlgId = quickSelect?.value;
+      if (file && targetDlgId) {
+        quickStatus.textContent = `⏳ Feltöltés folyamatban: ${file.name}...`;
+        quickStatus.className = 'upload-status-msg loading';
+        await audioMaster.saveVoice(targetDlgId, file, file.name);
+        quickStatus.textContent = `✅ Sikeresen feltöltve #${targetDlgId} dialógushoz: ${file.name} (${(file.size / 1024).toFixed(1)} KB)!`;
+        quickStatus.className = 'upload-status-msg success';
+        renderAudioMasterList();
+      }
+    });
+
+    container.appendChild(quickUploadBox);
+
+    // List each dialogue card
     dialogues.forEach(dlg => {
       const hasVoice = audioMaster.hasVoice(dlg.id);
       const voiceInfo = audioMaster.getVoiceInfo(dlg.id);
@@ -304,19 +370,20 @@ export function initAdmin(assets, bitManager, storyMaster, onAssetUpdated, onTri
         ${hasVoice && (voiceInfo.objectUrl || voiceInfo.dataUrl) ? `
           <div class="audio-player-wrapper">
             <audio controls class="real-audio-player" src="${voiceInfo.objectUrl || voiceInfo.dataUrl}"></audio>
-            <span class="audio-file-meta">${voiceInfo.name || dlg.id + '.mp3'}${sizeStr}</span>
+            <span class="audio-file-meta">Fájl: <strong>${voiceInfo.name || dlg.id + '.mp3'}</strong>${sizeStr}</span>
           </div>
         ` : ''}
 
+        <div class="audio-file-selector-row">
+          <label class="file-label">📁 MP3 Fájl Kiválasztása:</label>
+          <input type="file" accept="audio/*,.mp3,.wav,.ogg,.m4a" class="voice-file-input" data-id="${dlg.id}" />
+        </div>
+
         <div class="audio-actions">
-          <label class="upload-mp3-btn">
-            📁 ${hasVoice ? 'MP3 Módosítása' : 'MP3 Feltöltése'}
-            <input type="file" accept="audio/mp3,audio/*" class="voice-file-input" data-id="${dlg.id}" style="display:none;" />
-          </label>
           ${hasVoice ? `
-            <button class="delete-voice-btn danger-btn retro-btn" data-id="${dlg.id}">🗑 MP3 Törlése</button>
+            <button type="button" class="delete-voice-btn danger-btn retro-btn" data-id="${dlg.id}">🗑 MP3 Törlése</button>
           ` : ''}
-          <button class="trigger-dialogue-btn retro-btn" data-id="${dlg.id}">💬 Tesztelés Játékban</button>
+          <button type="button" class="trigger-dialogue-btn retro-btn" data-id="${dlg.id}">💬 Tesztelés Játékban</button>
         </div>
       `;
 
