@@ -176,16 +176,16 @@ export class StoryMaster {
   checkApartmentInteraction(player) {
     if (this.isInsideApartment) {
       // Inside apartment checks
-      if (player.x > 840) {
-        return { canEnter: true, isExit: true, prompt: 'Nyomj [E] / Érintsd a kilépéshez!' };
+      if (player.x > 800) {
+        return { canEnter: true, isExit: true, prompt: '🚪 Nyomj [E] / [W] / Érintsd a kilépéshez!' };
       }
-      if (player.x >= 580 && player.x <= 680) {
+      if (player.x >= 560 && player.x <= 680) {
         return { canEnter: false, prompt: '🔥 Hangulatos tatai kandalló' };
       }
-      if (player.x >= 380 && player.x <= 520) {
+      if (player.x >= 360 && player.x <= 540) {
         return { canEnter: false, prompt: '🛋️ ZsomBro Streamer Kanapé' };
       }
-      if (player.x < 240) {
+      if (player.x < 260) {
         return { canEnter: false, prompt: '🍳 Tatai Konyha & Hűtő' };
       }
       return null;
@@ -196,40 +196,41 @@ export class StoryMaster {
     const aptX = this.apartment.x;
     const dist = Math.abs(pX - aptX);
 
-    if (dist < 100) {
-      if (this.currentStage >= 3 || this.apartment.reached) {
-        return { canEnter: true, isExit: false, prompt: 'Nyomj [E] / Érintsd a belépéshez!' };
-      } else {
-        return { canEnter: false, prompt: 'Még nincs meg az 5 kristály bit kaució!' };
-      }
+    if (dist < 160) {
+      return { canEnter: true, isExit: false, prompt: '🏡 Belépés a házba: [E] / [W] / Érintsd meg!' };
     }
     return null;
   }
 
   interactApartment(player) {
     const check = this.checkApartmentInteraction(player);
-    if (!check || !check.canEnter) return false;
-
+    
     if (this.isInsideApartment) {
-      // Exit to outdoor
-      this.isInsideApartment = false;
-      player.x = 2300;
-      player.y = 388;
-      player.facingRight = false;
-      return true;
-    } else {
-      // Enter the Tata House!
-      this.isInsideApartment = true;
-      this.apartment.reached = true;
-      this.isStoryComplete = true;
-      player.x = 880; // Start at entrance door on the right
-      player.y = 388;
-      player.facingRight = false;
-
-      if (this.currentStage < 4) {
-        this.setStage(4);
+      if (check && check.canEnter) {
+        // Exit to outdoor
+        this.isInsideApartment = false;
+        player.x = 2300;
+        player.y = 388;
+        player.facingRight = false;
+        return true;
       }
-      return true;
+      return false;
+    } else {
+      // Outdoor entering
+      if (Math.abs(player.x - this.apartment.x) < 180 || (check && check.canEnter)) {
+        this.isInsideApartment = true;
+        this.apartment.reached = true;
+        this.isStoryComplete = true;
+        player.x = 860; // Start at entrance door on the right
+        player.y = 388;
+        player.facingRight = false;
+
+        if (this.currentStage < 4) {
+          this.setStage(4);
+        }
+        return true;
+      }
+      return false;
     }
   }
 

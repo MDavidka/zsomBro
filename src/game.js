@@ -124,6 +124,20 @@ const player = {
     if (keys.left) moveDir -= 1;
     if (keys.right) moveDir += 1;
 
+    if (moveDir !== 0) {
+      this.targetX = null;
+    } else if (this.targetX !== null) {
+      const dist = this.targetX - this.x;
+      if (Math.abs(dist) > 8) {
+        moveDir = Math.sign(dist);
+      } else {
+        this.targetX = null;
+        if (!storyMaster.isInsideApartment && Math.abs(this.x - storyMaster.apartment.x) < 120) {
+          storyMaster.interactApartment(this);
+        }
+      }
+    }
+
     const currentSpeed = keys.run ? this.runSpeed : this.speed;
 
     if (moveDir !== 0) {
@@ -396,7 +410,22 @@ window.addEventListener('keydown', (e) => {
   sound.init();
   if (e.code === 'ArrowLeft' || e.code === 'KeyA') keys.left = true;
   if (e.code === 'ArrowRight' || e.code === 'KeyD') keys.right = true;
-  if (e.code === 'ArrowUp' || e.code === 'KeyW' || e.code === 'Space') {
+  if (e.code === 'ArrowUp' || e.code === 'KeyW') {
+    // If in front of house / exit door, Up / W enters or exits immediately!
+    const nearHouse = !storyMaster.isInsideApartment && Math.abs(player.x - storyMaster.apartment.x) < 170;
+    const nearExit = storyMaster.isInsideApartment && player.x > 780;
+    if (nearHouse || nearExit) {
+      storyMaster.interactApartment(player);
+      e.preventDefault();
+      return;
+    }
+    if (!keys.jump) {
+      player.tryJump();
+    }
+    keys.jump = true;
+    e.preventDefault();
+  }
+  if (e.code === 'Space') {
     if (!keys.jump) {
       player.tryJump();
     }
@@ -416,12 +445,40 @@ window.addEventListener('keyup', (e) => {
   if (!e.shiftKey && (e.code === 'ShiftLeft' || e.code === 'ShiftRight')) keys.run = false;
 });
 
-window.addEventListener('pointerdown', () => {
+// Canvas Tap & Click Controller
+canvas.addEventListener('pointerdown', (e) => {
   sound.init();
   if (audioMaster.globalAudioEnabled && !audioMaster.isGlobalAudioPlaying) {
     audioMaster.playGlobalAudio();
   }
-}, { once: true });
+
+  const rect = canvas.getBoundingClientRect();
+  const clickX = e.clientX - rect.left;
+  const clickY = e.clientY - rect.top;
+
+  const virtualX = (clickX / rect.width) * virtualWidth;
+  const virtualY = (clickY / rect.height) * VIRTUAL_HEIGHT;
+  const worldX = virtualX + camera.x;
+
+  // Direct tap on house or exit door
+  if (!storyMaster.isInsideApartment) {
+    if (Math.abs(worldX - storyMaster.apartment.x) < 160 || Math.abs(player.x - storyMaster.apartment.x) < 170) {
+      storyMaster.interactApartment(player);
+      return;
+    }
+    player.targetX = Math.max(100, worldX);
+  } else {
+    if (worldX > 780 || player.x > 780) {
+      storyMaster.interactApartment(player);
+      return;
+    }
+    player.targetX = Math.max(70, Math.min(940, worldX));
+  }
+
+  if (virtualY < GROUND_Y - 75 && player.isGrounded) {
+    player.tryJump();
+  }
+});
 
 // Initialize Admin System
 initAdmin(
