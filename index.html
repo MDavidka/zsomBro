@@ -7,16 +7,18 @@
   <link rel="stylesheet" href="style.css" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
 </head>
 <body>
-  <div id="game-wrapper">
-    <canvas id="gameCanvas"></canvas>
+  <!-- Background & Game Canvas Layer (Layer 0) -->
+  <canvas id="gameCanvas"></canvas>
 
-    <!-- Admin Gear Toggle -->
+  <!-- UI & Controls Layer (Layer 1 - overlays on top without layout shift) -->
+  <div id="ui-layer">
+    <!-- Admin Settings Gear -->
     <button id="admin-toggle-btn" class="icon-btn" title="Admin Settings">⚙️</button>
 
-    <!-- Global Dialogue / Chatbox System -->
+    <!-- Global Dialogue Box Overlay -->
     <div id="dialogue-container" class="hidden">
       <div id="dialogue-box">
         <img id="dialogue-bg" src="assets/dialogue_box.png" alt="Dialogue Frame" />
@@ -31,54 +33,6 @@
       </div>
     </div>
 
-    <!-- Admin Settings Modal -->
-    <div id="admin-modal" class="modal hidden">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h2>🛠️ ADMIN ASSET MANAGER</h2>
-          <button id="admin-close-btn" class="close-btn">&times;</button>
-        </div>
-        <div class="modal-body">
-          <div class="asset-grid">
-            <div class="asset-card">
-              <label>🌄 Background Image</label>
-              <input type="file" id="upload-background" accept="image/*" />
-            </div>
-            <div class="asset-card">
-              <label>💬 Dialogue Box Frame</label>
-              <input type="file" id="upload-dialogue" accept="image/*" />
-            </div>
-            <div class="asset-card">
-              <label>🧍 Character (Idle)</label>
-              <input type="file" id="upload-idle" accept="image/*" />
-            </div>
-            <div class="asset-card">
-              <label>🚶 Walk 1</label>
-              <input type="file" id="upload-walk1" accept="image/*" />
-            </div>
-            <div class="asset-card">
-              <label>🚶 Walk 2</label>
-              <input type="file" id="upload-walk2" accept="image/*" />
-            </div>
-            <div class="asset-card">
-              <label>🏃 Run 1</label>
-              <input type="file" id="upload-run1" accept="image/*" />
-            </div>
-          </div>
-
-          <div class="dialogue-tester">
-            <label>💬 Test Custom Dialogue</label>
-            <input type="text" id="test-speaker" placeholder="Speaker Name (e.g. Zsombor)" value="Zsombor" />
-            <textarea id="test-message" placeholder="Type test message here...">Gyerünk, kezdődjön a stream!</textarea>
-            <button id="test-dialogue-btn" class="retro-btn">Trigger Dialogue</button>
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button id="reset-assets-btn" class="retro-btn danger-btn">Reset to Default Assets</button>
-        </div>
-      </div>
-    </div>
-
     <!-- Mobile Touch Controls -->
     <div id="mobile-controls">
       <div class="mobile-dpad">
@@ -88,6 +42,54 @@
       <div class="mobile-actions">
         <button id="btn-run" class="touch-btn action-btn">RUN</button>
         <button id="btn-jump" class="touch-btn action-btn primary-btn">JUMP</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Admin Settings Modal (Layer 2) -->
+  <div id="admin-modal" class="modal hidden">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>🛠️ ADMIN ASSET MANAGER</h2>
+        <button id="admin-close-btn" class="close-btn">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="asset-grid">
+          <div class="asset-card">
+            <label>🌄 Background Image</label>
+            <input type="file" id="upload-background" accept="image/*" />
+          </div>
+          <div class="asset-card">
+            <label>💬 Dialogue Box Frame</label>
+            <input type="file" id="upload-dialogue" accept="image/*" />
+          </div>
+          <div class="asset-card">
+            <label>🧍 Character (Idle)</label>
+            <input type="file" id="upload-idle" accept="image/*" />
+          </div>
+          <div class="asset-card">
+            <label>🚶 Walk 1</label>
+            <input type="file" id="upload-walk1" accept="image/*" />
+          </div>
+          <div class="asset-card">
+            <label>🚶 Walk 2</label>
+            <input type="file" id="upload-walk2" accept="image/*" />
+          </div>
+          <div class="asset-card">
+            <label>🏃 Run 1</label>
+            <input type="file" id="upload-run1" accept="image/*" />
+          </div>
+        </div>
+
+        <div class="dialogue-tester">
+          <label>💬 Test Custom Dialogue</label>
+          <input type="text" id="test-speaker" placeholder="Speaker Name (e.g. Zsombor)" value="Zsombor" />
+          <textarea id="test-message" placeholder="Type test message here...">Gyerünk, kezdődjön a stream!</textarea>
+          <button id="test-dialogue-btn" class="retro-btn">Trigger Dialogue</button>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="reset-assets-btn" class="retro-btn danger-btn">Reset to Default Assets</button>
       </div>
     </div>
   </div>
