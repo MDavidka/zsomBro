@@ -343,15 +343,13 @@ initAdmin(assets, (assetKey, dataUrl) => {
   }
 });
 
-// Start Story Opening Dialogue
-setTimeout(() => {
-  dialogue.show({
-    speaker: 'Narrátor',
-    text: 'E Játék egy bizonyos karakterrel kezdődik. Az ő neve zsombor , akinek egyetlen célja hogy eljusson a gépéhez és streamelni kezdjen.',
-    duration: 10000,
-    avatar: assets.idle.src
-  });
-}, 500);
+// Start Story Opening Dialogue with Cinematic Letterbox Bars
+dialogue.show({
+  speaker: 'Narrátor',
+  text: 'E Játék egy bizonyos karakterrel kezdődik. Az ő neve zsombor , akinek egyetlen célja hogy eljusson a gépéhez és streamelni kezdjen.',
+  duration: 10000,
+  cinematic: true
+});
 
 // Main game loop
 let lastTime = performance.now();

@@ -7,6 +7,8 @@ class DialogueSystem {
     this.textElem = document.getElementById('dialogue-text');
     this.avatarElem = document.getElementById('dialogue-avatar');
     this.arrowElem = document.getElementById('dialogue-arrow');
+    this.cinematicTop = document.getElementById('cinematic-top');
+    this.cinematicBottom = document.getElementById('cinematic-bottom');
 
     this.currentText = '';
     this.targetText = '';
@@ -20,22 +22,32 @@ class DialogueSystem {
   }
 
   bindEvents() {
-    if (!this.container) return;
-
     const advance = (e) => {
-      e.stopPropagation();
-      sound.init();
-      if (this.isTyping) {
-        // Instant finish typing
-        this.finishTyping();
-      } else {
-        // Close / advance dialogue
-        this.hide();
+      if (this.container && !this.container.classList.contains('hidden')) {
+        if (e) e.stopPropagation();
+        sound.init();
+        if (this.isTyping) {
+          this.finishTyping();
+        } else {
+          this.hide();
+        }
       }
     };
 
-    this.container.addEventListener('click', advance);
-    this.container.addEventListener('touchstart', advance, { passive: false });
+    if (this.container) {
+      this.container.addEventListener('click', advance);
+      this.container.addEventListener('touchstart', advance, { passive: false });
+    }
+
+    // Clicking anywhere on screen during cinematic intro advances/dismisses it
+    window.addEventListener('click', (e) => {
+      if (this.container && !this.container.classList.contains('hidden')) {
+        // don't double trigger if clicked dialogue directly
+        if (!e.target.closest('#admin-modal') && !e.target.closest('#admin-toggle-btn')) {
+          advance(e);
+        }
+      }
+    });
 
     window.addEventListener('keydown', (e) => {
       if (this.container && !this.container.classList.contains('hidden')) {
@@ -46,7 +58,17 @@ class DialogueSystem {
     });
   }
 
-  show({ speaker = 'Narrátor', text = '', duration = 10000, avatar = 'assets/zsomborr.png', onComplete = null }) {
+  showCinematicBars() {
+    this.cinematicTop?.classList.remove('dismissed');
+    this.cinematicBottom?.classList.remove('dismissed');
+  }
+
+  dismissCinematicBars() {
+    this.cinematicTop?.classList.add('dismissed');
+    this.cinematicBottom?.classList.add('dismissed');
+  }
+
+  show({ speaker = 'Narrátor', text = '', duration = 10000, avatar = null, cinematic = true, onComplete = null }) {
     if (!this.container) return;
 
     this.targetText = text;
@@ -54,8 +76,20 @@ class DialogueSystem {
     this.typewriterIndex = 0;
     this.onCompleteCallback = onComplete;
 
+    if (cinematic) {
+      this.showCinematicBars();
+    }
+
     if (this.speakerElem) this.speakerElem.textContent = speaker;
-    if (this.avatarElem && avatar) this.avatarElem.src = avatar;
+    if (this.avatarElem) {
+      if (avatar) {
+        this.avatarElem.src = avatar;
+        this.avatarElem.classList.remove('hidden');
+      } else {
+        this.avatarElem.classList.add('hidden');
+      }
+    }
+
     if (this.textElem) this.textElem.textContent = '';
     if (this.arrowElem) this.arrowElem.style.display = 'none';
 
@@ -73,16 +107,15 @@ class DialogueSystem {
         this.currentText += this.targetText[this.typewriterIndex];
         this.textElem.textContent = this.currentText;
         
-        // Play subtle retro blip
         if (this.typewriterIndex % 2 === 0 && this.targetText[this.typewriterIndex] !== ' ') {
-          sound.playTone(420 + (this.typewriterIndex % 5) * 40, 'square', 0.04, 0.05);
+          sound.playTone(430 + (this.typewriterIndex % 4) * 35, 'square', 0.035, 0.04);
         }
         
         this.typewriterIndex++;
       } else {
         this.finishTyping(duration);
       }
-    }, 38);
+    }, 36);
   }
 
   finishTyping(autoCloseDuration = 10000) {
@@ -95,7 +128,6 @@ class DialogueSystem {
     if (this.textElem) this.textElem.textContent = this.currentText;
     if (this.arrowElem) this.arrowElem.style.display = 'block';
 
-    // Set auto-dismiss timer
     if (autoCloseDuration > 0) {
       this.autoCloseTimeout = setTimeout(() => {
         this.hide();
@@ -105,6 +137,7 @@ class DialogueSystem {
 
   hide() {
     this.clearTimers();
+    this.dismissCinematicBars();
     if (this.container) {
       this.container.classList.add('hidden');
     }
@@ -137,7 +170,6 @@ export function initAdmin(assets, onAssetUpdated) {
   const resetBtn = document.getElementById('reset-assets-btn');
   const testBtn = document.getElementById('test-dialogue-btn');
 
-  // Toggle modal
   toggleBtn?.addEventListener('click', () => {
     modal?.classList.remove('hidden');
   });
@@ -146,7 +178,6 @@ export function initAdmin(assets, onAssetUpdated) {
     modal?.classList.add('hidden');
   });
 
-  // Upload handler helper
   const setupUploader = (inputId, assetKey, storageKey) => {
     const input = document.getElementById(inputId);
     if (!input) return;
@@ -184,22 +215,19 @@ export function initAdmin(assets, onAssetUpdated) {
   setupUploader('upload-walk2', 'walk2', 'walk2');
   setupUploader('upload-run1', 'run1', 'run1');
 
-  // Reset assets
   resetBtn?.addEventListener('click', () => {
     const keys = ['background', 'dialogue', 'idle', 'walk1', 'walk2', 'run1'];
     keys.forEach(k => localStorage.removeItem('custom_asset_' + k));
     location.reload();
   });
 
-  // Test custom dialogue
   testBtn?.addEventListener('click', () => {
     const speaker = document.getElementById('test-speaker')?.value || 'Zsombor';
     const text = document.getElementById('test-message')?.value || 'Teszt üzenet!';
     modal?.classList.add('hidden');
-    dialogue.show({ speaker, text, duration: 6000 });
+    dialogue.show({ speaker, text, duration: 6000, cinematic: true });
   });
 
-  // Key shortcut for Admin: `~` or F2
   window.addEventListener('keydown', (e) => {
     if (e.key === '`' || e.key === '~' || e.key === 'F2') {
       modal?.classList.toggle('hidden');

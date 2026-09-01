@@ -32,6 +32,37 @@ html, body {
   image-rendering: crisp-edges;
 }
 
+/* Cinematic Letterbox Bars */
+.cinematic-bar {
+  position: fixed;
+  left: 0;
+  width: 100vw;
+  height: 16vh;
+  min-height: 50px;
+  background: #000000;
+  z-index: 5;
+  pointer-events: none;
+  transition: transform 0.75s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+#cinematic-top {
+  top: 0;
+  transform: translateY(0);
+}
+
+#cinematic-top.dismissed {
+  transform: translateY(-100%);
+}
+
+#cinematic-bottom {
+  bottom: 0;
+  transform: translateY(0);
+}
+
+#cinematic-bottom.dismissed {
+  transform: translateY(100%);
+}
+
 /* Layer 1: Overlay UI Layer */
 #ui-layer {
   position: fixed;
@@ -49,7 +80,7 @@ html, body {
   position: absolute;
   top: 14px;
   right: 14px;
-  background: rgba(22, 27, 34, 0.75);
+  background: rgba(22, 27, 34, 0.8);
   border: 1px solid rgba(88, 166, 255, 0.5);
   color: #c9d1d9;
   border-radius: 50%;
@@ -78,19 +109,19 @@ html, body {
   top: 14px;
   left: 50%;
   transform: translateX(-50%);
-  width: min(92vw, 640px);
+  width: min(92vw, 680px);
   aspect-ratio: 987 / 224;
   max-height: 160px;
   z-index: 150;
   pointer-events: auto;
   cursor: pointer;
-  animation: popIn 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
 @keyframes popIn {
   from {
     opacity: 0;
-    transform: translateX(-50%) translateY(-12px) scale(0.96);
+    transform: translateX(-50%) translateY(-14px) scale(0.95);
   }
   to {
     opacity: 1;
@@ -109,7 +140,7 @@ html, body {
   height: 100%;
   display: block;
   image-rendering: pixelated;
-  filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.6));
+  filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.7));
 }
 
 #dialogue-avatar-container {
@@ -139,7 +170,7 @@ html, body {
   width: 25%;
   height: 22%;
   color: #ffffff;
-  font-size: clamp(7px, 1.3vw, 11px);
+  font-size: clamp(7px, 1.35vw, 12px);
   font-weight: bold;
   display: flex;
   align-items: center;
@@ -258,6 +289,10 @@ html, body {
 }
 
 @media (max-height: 500px) {
+  .cinematic-bar {
+    height: 12vh;
+    min-height: 35px;
+  }
   #dialogue-container {
     width: min(76vw, 480px);
     top: 6px;

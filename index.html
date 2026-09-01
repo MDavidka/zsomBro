@@ -13,7 +13,11 @@
   <!-- Background & Game Canvas Layer (Layer 0) -->
   <canvas id="gameCanvas"></canvas>
 
-  <!-- UI & Controls Layer (Layer 1 - overlays on top without layout shift) -->
+  <!-- Cinematic Letterbox Bars (Top & Bottom) -->
+  <div id="cinematic-top" class="cinematic-bar"></div>
+  <div id="cinematic-bottom" class="cinematic-bar"></div>
+
+  <!-- UI & Controls Layer (Layer 1) -->
   <div id="ui-layer">
     <!-- Admin Settings Gear -->
     <button id="admin-toggle-btn" class="icon-btn" title="Admin Settings">⚙️</button>
@@ -23,7 +27,7 @@
       <div id="dialogue-box">
         <img id="dialogue-bg" src="assets/dialogue_box.png" alt="Dialogue Frame" />
         <div id="dialogue-avatar-container">
-          <img id="dialogue-avatar" src="assets/zsomborr.png" alt="Avatar" />
+          <img id="dialogue-avatar" src="assets/zsomborr.png" alt="Avatar" class="hidden" />
         </div>
         <div id="dialogue-speaker">Narrátor</div>
         <div id="dialogue-text-container">
