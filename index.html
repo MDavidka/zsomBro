@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>ZsomBro - Pixel Art Game</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div id="game-container">
+    <div id="ui-header">
+      <div class="hud-item">
+        <span class="hud-label">CHARACTER:</span>
+        <span class="hud-value" id="char-name">Zsomborr</span>
+      </div>
+      <div class="hud-item">
+        <span class="hud-label">STATUS:</span>
+        <span class="hud-value" id="char-status">Ready</span>
+      </div>
+      <div class="hud-controls">
+        <button id="sound-btn" class="retro-btn" title="Toggle Sound">🔊 SFX</button>
+        <button id="fullscreen-btn" class="retro-btn" title="Fullscreen">⛶</button>
+      </div>
+    </div>
+
+    <div class="canvas-wrapper">
+      <canvas id="gameCanvas" width="1024" height="512"></canvas>
+      <div id="crt-overlay"></div>
+      
+      <div id="instructions-badge">
+        <span class="key-badge">A</span><span class="key-badge">D</span> or <span class="key-badge">←</span><span class="key-badge">→</span> Move | 
+        <span class="key-badge">W</span> / <span class="key-badge">SPACE</span> Jump | 
+        <span class="key-badge">SHIFT</span> Run
+      </div>
+    </div>
+
+    <!-- Mobile Touch Controls -->
+    <div id="mobile-controls">
+      <div class="d-pad">
+        <button id="btn-left" class="touch-btn">◀</button>
+        <button id="btn-right" class="touch-btn">▶</button>
+      </div>
+      <div class="action-buttons">
+        <button id="btn-run" class="touch-btn action-btn">RUN</button>
+        <button id="btn-jump" class="touch-btn action-btn primary-action">JUMP</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="src/game.js"></script>
+</body>
+</html>
