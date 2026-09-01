@@ -2,27 +2,44 @@ import { sound } from './audio.js';
 
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
-const statusElem = document.getElementById('char-status');
-const soundBtn = document.getElementById('sound-btn');
-const fullscreenBtn = document.getElementById('fullscreen-btn');
 
-// Disable smoothing for crisp pixel-art look
-ctx.imageSmoothingEnabled = false;
+// Game state & virtual resolution
+const VIRTUAL_HEIGHT = 512;
+let VIRTUAL_WIDTH = 1024;
+let scale = 1;
 
-// Game constants
-const CANVAS_WIDTH = 1024;
-const CANVAS_HEIGHT = 512;
-const GROUND_Y = 380; // Grass platform level
+function resizeCanvas() {
+  const dpr = window.devicePixelRatio || 1;
+  const screenWidth = window.innerWidth;
+  const screenHeight = window.innerHeight;
 
-// Assets
+  canvas.width = screenWidth * dpr;
+  canvas.height = screenHeight * dpr;
+
+  // Scale virtual coordinates to fit screen height
+  scale = (screenHeight * dpr) / VIRTUAL_HEIGHT;
+  VIRTUAL_WIDTH = (screenWidth * dpr) / scale;
+
+  ctx.imageSmoothingEnabled = false;
+}
+
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+
+const GROUND_Y = 380; // Ground platform height in virtual units
+
+// Assets manager
 const assets = {
   background: new Image(),
-  zsomborr: new Image(),
+  idle: new Image(),
+  walk1: new Image(),
+  walk2: new Image(),
+  run1: new Image(),
   loaded: false
 };
 
 let loadedCount = 0;
-const totalAssets = 2;
+const totalAssets = 5;
 
 function checkAssetLoaded() {
   loadedCount++;
@@ -32,14 +49,20 @@ function checkAssetLoaded() {
 }
 
 assets.background.onload = checkAssetLoaded;
-assets.zsomborr.onload = checkAssetLoaded;
+assets.idle.onload = checkAssetLoaded;
+assets.walk1.onload = checkAssetLoaded;
+assets.walk2.onload = checkAssetLoaded;
+assets.run1.onload = checkAssetLoaded;
 
 assets.background.src = 'assets/background.png';
-assets.zsomborr.src = 'assets/zsomborr.png';
+assets.idle.src = 'assets/zsomborr.png';
+assets.walk1.src = 'assets/walk1.png';
+assets.walk2.src = 'assets/walk2.png';
+assets.run1.src = 'assets/run1.png';
 
-// Particle system for dust & landing
+// Particle system
 const particles = [];
-function createDust(x, y, count = 3, color = 'rgba(230, 240, 230, 0.7)') {
+function createDust(x, y, count = 3, color = 'rgba(240, 245, 240, 0.7)') {
   for (let i = 0; i < count; i++) {
     particles.push({
       x: x + (Math.random() * 16 - 8),
@@ -62,7 +85,7 @@ const keys = {
   run: false
 };
 
-// Key listeners
+// Keyboard inputs
 window.addEventListener('keydown', (e) => {
   sound.init();
   if (e.code === 'ArrowLeft' || e.code === 'KeyA') keys.left = true;
@@ -84,7 +107,7 @@ window.addEventListener('keyup', (e) => {
   if (!e.shiftKey && (e.code === 'ShiftLeft' || e.code === 'ShiftRight')) keys.run = false;
 });
 
-// Touch listeners for mobile
+// Mobile touch bindings
 const bindTouch = (btnId, keyName) => {
   const btn = document.getElementById(btnId);
   if (!btn) return;
@@ -116,45 +139,29 @@ bindTouch('btn-right', 'right');
 bindTouch('btn-jump', 'jump');
 bindTouch('btn-run', 'run');
 
-// Sound toggle
-soundBtn.addEventListener('click', () => {
-  sound.init();
-  const isMuted = sound.toggleMute();
-  soundBtn.textContent = isMuted ? '🔇 SFX' : '🔊 SFX';
-});
+// Enable sound on first interaction anywhere
+window.addEventListener('pointerdown', () => sound.init(), { once: true });
 
-// Fullscreen toggle
-fullscreenBtn.addEventListener('click', () => {
-  const container = document.getElementById('game-container');
-  if (!document.fullscreenElement) {
-    container.requestFullscreen?.().catch(() => {});
-  } else {
-    document.exitFullscreen?.().catch(() => {});
-  }
-});
-
-// Camera state
+// Camera
 const camera = {
-  x: 0,
-  speed: 0
+  x: 0
 };
 
 // Player: Zsomborr
 const player = {
   name: 'Zsomborr',
-  x: CANVAS_WIDTH / 2 - 40,
+  x: 512,
   y: GROUND_Y,
-  width: 64,   // scaled width for pixel sprite
-  height: 124, // scaled height for pixel sprite
+  height: 130, // rendered height
   vx: 0,
   vy: 0,
-  speed: 3.8,
-  runSpeed: 6.2,
-  gravity: 0.55,
-  jumpStrength: -12.5,
+  speed: 4.2,
+  runSpeed: 7.2,
+  gravity: 0.58,
+  jumpStrength: -13.2,
   isGrounded: true,
   facingRight: true,
-  walkTimer: 0,
+  animTimer: 0,
   idleTimer: 0,
   state: 'idle',
 
@@ -163,12 +170,11 @@ const player = {
       this.vy = this.jumpStrength;
       this.isGrounded = false;
       sound.playShoot();
-      createDust(this.x + this.width / 2, this.y, 6);
+      createDust(this.x, this.y, 7);
     }
   },
 
   update(dt) {
-    // Movement calculation
     let moveDir = 0;
     if (keys.left) moveDir -= 1;
     if (keys.right) moveDir += 1;
@@ -178,19 +184,19 @@ const player = {
     if (moveDir !== 0) {
       this.vx = moveDir * currentSpeed;
       this.facingRight = moveDir > 0;
-      this.walkTimer += dt * (keys.run ? 14 : 9);
+      this.animTimer += dt * (keys.run ? 14 : 9);
 
       if (this.isGrounded) {
-        this.state = keys.run ? 'Running' : 'Walking';
-        if (Math.sin(this.walkTimer) < -0.8) {
-          createDust(this.x + this.width / 2, this.y, 1);
+        this.state = keys.run ? 'running' : 'walking';
+        if (Math.sin(this.animTimer) < -0.8) {
+          createDust(this.x, this.y, keys.run ? 2 : 1);
         }
       }
     } else {
       this.vx = 0;
-      this.walkTimer = 0;
+      this.animTimer = 0;
       if (this.isGrounded) {
-        this.state = 'Idle';
+        this.state = 'idle';
       }
     }
 
@@ -201,7 +207,7 @@ const player = {
     // Ground collision
     if (this.y >= GROUND_Y) {
       if (!this.isGrounded && this.vy > 2) {
-        createDust(this.x + this.width / 2, GROUND_Y, 8);
+        createDust(this.x, GROUND_Y, 8);
         sound.playHit();
       }
       this.y = GROUND_Y;
@@ -209,23 +215,12 @@ const player = {
       this.isGrounded = true;
     } else {
       this.isGrounded = false;
-      this.state = this.vy < 0 ? 'Jumping' : 'Falling';
+      this.state = 'jumping';
     }
 
-    // Horizontal position & camera scrolling
+    // Move player & scroll camera smoothly
     this.x += this.vx;
-
-    // Keep player in center region and pan camera/background
-    const margin = 350;
-    if (this.x > CANVAS_WIDTH - margin) {
-      const diff = this.x - (CANVAS_WIDTH - margin);
-      this.x = CANVAS_WIDTH - margin;
-      camera.x += diff;
-    } else if (this.x < margin) {
-      const diff = margin - this.x;
-      this.x = margin;
-      camera.x -= diff;
-    }
+    camera.x = this.x - VIRTUAL_WIDTH / 2;
 
     this.idleTimer += dt * 3;
   },
@@ -233,33 +228,46 @@ const player = {
   draw(ctx) {
     if (!assets.loaded) return;
 
-    ctx.save();
-
-    // Position origin at feet
-    const drawX = Math.round(this.x);
-    let drawY = Math.round(this.y);
-
-    // Subtle walking bounce / breathing animation
+    // Select active sprite frame
+    let currentSprite = assets.idle;
     let bounceY = 0;
     let tiltAngle = 0;
 
-    if (this.state === 'Walking' || this.state === 'Running') {
-      bounceY = Math.abs(Math.sin(this.walkTimer)) * 4;
-      tiltAngle = Math.sin(this.walkTimer) * (this.facingRight ? 0.05 : -0.05);
-    } else if (this.state === 'Idle') {
+    if (this.state === 'running') {
+      currentSprite = assets.run1;
+      bounceY = Math.abs(Math.sin(this.animTimer * 1.3)) * 6;
+      tiltAngle = (this.facingRight ? 0.12 : -0.12);
+    } else if (this.state === 'walking') {
+      // Alternate between walk1 and walk2
+      const step = Math.floor(this.animTimer) % 2;
+      currentSprite = step === 0 ? assets.walk1 : assets.walk2;
+      bounceY = Math.abs(Math.sin(this.animTimer)) * 4;
+      tiltAngle = Math.sin(this.animTimer) * (this.facingRight ? 0.04 : -0.04);
+    } else if (this.state === 'idle') {
+      currentSprite = assets.idle;
       bounceY = Math.sin(this.idleTimer) * 1.5;
-    } else if (!this.isGrounded) {
+    } else if (this.state === 'jumping') {
+      currentSprite = keys.run ? assets.run1 : assets.walk1;
       tiltAngle = this.vy * 0.015 * (this.facingRight ? 1 : -1);
     }
 
-    // Character shadow on the grass
-    ctx.fillStyle = 'rgba(15, 25, 10, 0.4)';
+    // Calculate aspect ratio width
+    const spriteAspect = (currentSprite.width || 100) / (currentSprite.height || 188);
+    const renderWidth = this.height * spriteAspect;
+
+    const screenX = this.x - camera.x;
+    const screenY = this.y;
+
+    ctx.save();
+
+    // Shadow under feet
+    ctx.fillStyle = 'rgba(15, 25, 10, 0.45)';
     ctx.beginPath();
-    const shadowScale = Math.max(0.4, 1 - (GROUND_Y - this.y) / 200);
+    const shadowScale = Math.max(0.35, 1 - (GROUND_Y - this.y) / 200);
     ctx.ellipse(
-      drawX + this.width / 2,
+      screenX,
       GROUND_Y - 2,
-      (this.width / 2) * shadowScale,
+      (renderWidth / 2.2) * shadowScale,
       6 * shadowScale,
       0,
       0,
@@ -267,20 +275,20 @@ const player = {
     );
     ctx.fill();
 
-    // Character drawing with direction flip
-    ctx.translate(drawX + this.width / 2, drawY - bounceY);
+    // Position origin at feet base
+    ctx.translate(screenX, screenY - bounceY);
     ctx.rotate(tiltAngle);
 
     if (!this.facingRight) {
       ctx.scale(-1, 1);
     }
 
-    // Draw sprite centered at feet base
+    // Draw sprite
     ctx.drawImage(
-      assets.zsomborr,
-      -this.width / 2,
+      currentSprite,
+      -renderWidth / 2,
       -this.height,
-      this.width,
+      renderWidth,
       this.height
     );
 
@@ -290,20 +298,25 @@ const player = {
 
 // Draw seamless repeating background
 function drawBackground(ctx) {
-  if (!assets.loaded) {
-    ctx.fillStyle = '#4a75a0';
-    ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-    return;
-  }
+  if (!assets.loaded) return;
 
   const bgWidth = assets.background.width || 1024;
-  const bgHeight = assets.background.height || 512;
-  const offsetX = -(camera.x % bgWidth);
+  const bgHeight = VIRTUAL_HEIGHT;
 
-  // Render main and seamless adjacent tiles
-  ctx.drawImage(assets.background, offsetX - bgWidth, 0, bgWidth, CANVAS_HEIGHT);
-  ctx.drawImage(assets.background, offsetX, 0, bgWidth, CANVAS_HEIGHT);
-  ctx.drawImage(assets.background, offsetX + bgWidth, 0, bgWidth, CANVAS_HEIGHT);
+  // Calculate parallax offset
+  const offsetX = -(camera.x % bgWidth);
+  const startTile = Math.floor(-offsetX / bgWidth) - 1;
+  const endTile = Math.ceil((VIRTUAL_WIDTH - offsetX) / bgWidth) + 1;
+
+  for (let i = startTile; i <= endTile; i++) {
+    ctx.drawImage(
+      assets.background,
+      offsetX + i * bgWidth,
+      0,
+      bgWidth,
+      bgHeight
+    );
+  }
 }
 
 // Particle update & draw
@@ -319,49 +332,51 @@ function updateAndDrawParticles(ctx, dt) {
       continue;
     }
 
+    const screenX = p.x - camera.x;
+    const screenY = p.y;
+
     ctx.fillStyle = p.color;
     ctx.globalAlpha = p.life;
-    ctx.fillRect(Math.round(p.x), Math.round(p.y), p.size, p.size);
+    ctx.fillRect(Math.round(screenX), Math.round(screenY), p.size, p.size);
   }
   ctx.globalAlpha = 1.0;
 }
 
-// Game loop
+// Main game loop
 let lastTime = performance.now();
 
 function gameLoop(timestamp) {
   const dt = Math.min((timestamp - lastTime) / 1000, 0.1);
   lastTime = timestamp;
 
+  ctx.save();
+  ctx.scale(scale, scale);
+
   // Clear canvas
-  ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+  ctx.clearRect(0, 0, VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
 
   if (!assets.loaded) {
     ctx.fillStyle = '#0f111a';
-    ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+    ctx.fillRect(0, 0, VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
     ctx.fillStyle = '#58a6ff';
     ctx.font = '16px "Press Start 2P", monospace';
     ctx.textAlign = 'center';
-    ctx.fillText('LOADING ASSETS...', CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2);
+    ctx.fillText('LOADING ZSOMBRO...', VIRTUAL_WIDTH / 2, VIRTUAL_HEIGHT / 2);
+    ctx.restore();
     requestAnimationFrame(gameLoop);
     return;
   }
 
-  // Update
+  // Update logic
   player.update(dt);
-
-  // Update UI Status
-  if (statusElem) {
-    statusElem.textContent = player.state;
-  }
 
   // Render Scene
   drawBackground(ctx);
   updateAndDrawParticles(ctx, dt);
   player.draw(ctx);
 
+  ctx.restore();
   requestAnimationFrame(gameLoop);
 }
 
-// Start game
 requestAnimationFrame(gameLoop);
