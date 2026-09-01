@@ -41,6 +41,51 @@ const camera = {
   x: 0
 };
 
+// Cinematic Letterbox System (Rendered directly on canvas layer)
+const cinematic = {
+  active: true,
+  progress: 1.0,   // 1.0 = fully closed cinematic bars, 0.0 = fully open
+  target: 1.0,
+  barHeight: 88,   // virtual pixels height for top and bottom letterbox bars
+
+  update(dt) {
+    if (this.progress !== this.target) {
+      const speed = 2.4;
+      if (this.progress < this.target) {
+        this.progress = Math.min(this.target, this.progress + dt * speed);
+      } else {
+        this.progress = Math.max(this.target, this.progress - dt * speed);
+      }
+    }
+  },
+
+  draw(ctx) {
+    if (this.progress <= 0.001) return;
+    const currentH = this.barHeight * this.progress;
+
+    ctx.fillStyle = '#000000';
+    // Upper cinematic bar (slides upward off-screen)
+    ctx.fillRect(0, 0, virtualWidth, currentH);
+    // Lower cinematic bar (slides downward off-screen)
+    ctx.fillRect(0, VIRTUAL_HEIGHT - currentH, virtualWidth, currentH);
+  },
+
+  dismiss() {
+    this.target = 0.0;
+    this.active = false;
+  },
+
+  show() {
+    this.target = 1.0;
+    this.active = true;
+  }
+};
+
+// Connect dialogue dismiss to cinematic dismiss
+dialogue.setOnDismiss(() => {
+  cinematic.dismiss();
+});
+
 // Player Object (Zsomborr)
 const player = {
   name: 'Zsomborr',
@@ -227,13 +272,6 @@ const assets = {
   run1: loadImage('assets/run1.png', 'run1')
 };
 
-// Check if custom dialogue box frame exists in localStorage
-const savedDialogueBg = localStorage.getItem('custom_asset_dialogue');
-if (savedDialogueBg) {
-  const bg = document.getElementById('dialogue-bg');
-  if (bg) bg.src = savedDialogueBg;
-}
-
 // Background rendering
 function drawBackground(ctx) {
   const bgImg = assets.background;
@@ -336,19 +374,25 @@ window.addEventListener('keyup', (e) => {
 window.addEventListener('pointerdown', () => sound.init(), { once: true });
 
 // Initialize Admin System
-initAdmin(assets, (assetKey, dataUrl) => {
-  if (assetKey === 'idle') {
-    const avatar = document.getElementById('dialogue-avatar');
-    if (avatar) avatar.src = dataUrl;
+initAdmin(
+  assets,
+  (assetKey, dataUrl) => {
+    if (assetKey === 'idle') {
+      const avatar = document.getElementById('dialogue-avatar');
+      if (avatar) avatar.src = dataUrl;
+    }
+  },
+  (speaker, text) => {
+    cinematic.show();
+    dialogue.show({ speaker, text, duration: 6000 });
   }
-});
+);
 
-// Start Story Opening Dialogue with Cinematic Letterbox Bars
+// Launch Story Opening Dialogue & Cinematic Bars
 dialogue.show({
   speaker: 'Narrátor',
   text: 'E Játék egy bizonyos karakterrel kezdődik. Az ő neve zsombor , akinek egyetlen célja hogy eljusson a gépéhez és streamelni kezdjen.',
-  duration: 10000,
-  cinematic: true
+  duration: 10000
 });
 
 // Main game loop
@@ -362,16 +406,20 @@ function gameLoop(timestamp) {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  // Apply virtual scale
+  // Apply virtual coordinate scale
   ctx.scale(scale, scale);
 
-  // Update
+  // Update logic
   player.update(dt);
+  cinematic.update(dt);
 
-  // Render
+  // Render Scene
   drawBackground(ctx);
   updateAndDrawParticles(ctx, dt);
   player.draw(ctx);
+
+  // Render Cinematic Bars on top of scene
+  cinematic.draw(ctx);
 
   requestAnimationFrame(gameLoop);
 }

@@ -7,8 +7,6 @@ class DialogueSystem {
     this.textElem = document.getElementById('dialogue-text');
     this.avatarElem = document.getElementById('dialogue-avatar');
     this.arrowElem = document.getElementById('dialogue-arrow');
-    this.cinematicTop = document.getElementById('cinematic-top');
-    this.cinematicBottom = document.getElementById('cinematic-bottom');
 
     this.currentText = '';
     this.targetText = '';
@@ -16,7 +14,7 @@ class DialogueSystem {
     this.typewriterInterval = null;
     this.autoCloseTimeout = null;
     this.isTyping = false;
-    this.onCompleteCallback = null;
+    this.onDismissCallback = null;
 
     this.bindEvents();
   }
@@ -39,10 +37,9 @@ class DialogueSystem {
       this.container.addEventListener('touchstart', advance, { passive: false });
     }
 
-    // Clicking anywhere on screen during cinematic intro advances/dismisses it
+    // Global click / tap to advance dialogue & cinematic intro
     window.addEventListener('click', (e) => {
       if (this.container && !this.container.classList.contains('hidden')) {
-        // don't double trigger if clicked dialogue directly
         if (!e.target.closest('#admin-modal') && !e.target.closest('#admin-toggle-btn')) {
           advance(e);
         }
@@ -58,27 +55,16 @@ class DialogueSystem {
     });
   }
 
-  showCinematicBars() {
-    this.cinematicTop?.classList.remove('dismissed');
-    this.cinematicBottom?.classList.remove('dismissed');
+  setOnDismiss(cb) {
+    this.onDismissCallback = cb;
   }
 
-  dismissCinematicBars() {
-    this.cinematicTop?.classList.add('dismissed');
-    this.cinematicBottom?.classList.add('dismissed');
-  }
-
-  show({ speaker = 'Narrátor', text = '', duration = 10000, avatar = null, cinematic = true, onComplete = null }) {
+  show({ speaker = 'Narrátor', text = '', duration = 10000, avatar = null }) {
     if (!this.container) return;
 
     this.targetText = text;
     this.currentText = '';
     this.typewriterIndex = 0;
-    this.onCompleteCallback = onComplete;
-
-    if (cinematic) {
-      this.showCinematicBars();
-    }
 
     if (this.speakerElem) this.speakerElem.textContent = speaker;
     if (this.avatarElem) {
@@ -137,14 +123,11 @@ class DialogueSystem {
 
   hide() {
     this.clearTimers();
-    this.dismissCinematicBars();
     if (this.container) {
       this.container.classList.add('hidden');
     }
-    if (this.onCompleteCallback) {
-      const cb = this.onCompleteCallback;
-      this.onCompleteCallback = null;
-      cb();
+    if (this.onDismissCallback) {
+      this.onDismissCallback();
     }
   }
 
@@ -163,7 +146,7 @@ class DialogueSystem {
 export const dialogue = new DialogueSystem();
 
 // Admin Asset Manager
-export function initAdmin(assets, onAssetUpdated) {
+export function initAdmin(assets, onAssetUpdated, onTriggerDialogue) {
   const modal = document.getElementById('admin-modal');
   const toggleBtn = document.getElementById('admin-toggle-btn');
   const closeBtn = document.getElementById('admin-close-btn');
@@ -225,7 +208,7 @@ export function initAdmin(assets, onAssetUpdated) {
     const speaker = document.getElementById('test-speaker')?.value || 'Zsombor';
     const text = document.getElementById('test-message')?.value || 'Teszt üzenet!';
     modal?.classList.add('hidden');
-    dialogue.show({ speaker, text, duration: 6000, cinematic: true });
+    if (onTriggerDialogue) onTriggerDialogue(speaker, text);
   });
 
   window.addEventListener('keydown', (e) => {

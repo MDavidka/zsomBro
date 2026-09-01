@@ -4,20 +4,16 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <title>ZsomBro</title>
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="style.css?v=1788280732" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
 </head>
 <body>
-  <!-- Background & Game Canvas Layer (Layer 0) -->
+  <!-- Layer 0: Game Canvas (Direct WebGL/2D Pixel Layer) -->
   <canvas id="gameCanvas"></canvas>
 
-  <!-- Cinematic Letterbox Bars (Top & Bottom) -->
-  <div id="cinematic-top" class="cinematic-bar"></div>
-  <div id="cinematic-bottom" class="cinematic-bar"></div>
-
-  <!-- UI & Controls Layer (Layer 1) -->
+  <!-- Layer 1: Floating UI & Dialogue Overlay -->
   <div id="ui-layer">
     <!-- Admin Settings Gear -->
     <button id="admin-toggle-btn" class="icon-btn" title="Admin Settings">⚙️</button>
@@ -25,7 +21,7 @@
     <!-- Global Dialogue Box Overlay -->
     <div id="dialogue-container" class="hidden">
       <div id="dialogue-box">
-        <img id="dialogue-bg" src="assets/dialogue_box.png" alt="Dialogue Frame" />
+        <img id="dialogue-bg" src="assets/dialogue_box.png?v=1788280732" alt="Dialogue Frame" />
         <div id="dialogue-avatar-container">
           <img id="dialogue-avatar" src="assets/zsomborr.png" alt="Avatar" class="hidden" />
         </div>
@@ -50,7 +46,7 @@
     </div>
   </div>
 
-  <!-- Admin Settings Modal (Layer 2) -->
+  <!-- Layer 2: Admin Settings Modal -->
   <div id="admin-modal" class="modal hidden">
     <div class="modal-content">
       <div class="modal-header">
@@ -98,6 +94,6 @@
     </div>
   </div>
 
-  <script type="module" src="src/game.js"></script>
+  <script type="module" src="src/game.js?v=1788280732"></script>
 </body>
 </html>
