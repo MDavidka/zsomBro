@@ -288,6 +288,7 @@ export function initAdmin(assets, bitManager, storyMaster, onAssetUpdated, onTri
   };
 
   setupUploader('upload-background', 'background', 'background');
+  setupUploader('upload-interior', 'interior', 'interior');
   setupUploader('upload-bit', 'bit', 'bit');
   setupUploader('upload-dialogue', 'dialogue', 'dialogue');
   setupUploader('upload-idle', 'idle', 'idle');
@@ -296,7 +297,7 @@ export function initAdmin(assets, bitManager, storyMaster, onAssetUpdated, onTri
   setupUploader('upload-run1', 'run1', 'run1');
 
   resetBtn?.addEventListener('click', () => {
-    const keys = ['background', 'bit', 'dialogue', 'idle', 'walk1', 'walk2', 'run1'];
+    const keys = ['background', 'interior', 'bit', 'dialogue', 'idle', 'walk1', 'walk2', 'run1'];
     keys.forEach(k => localStorage.removeItem('custom_asset_' + k));
     location.reload();
   });

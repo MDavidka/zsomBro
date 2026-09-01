@@ -163,8 +163,14 @@ const player = {
     }
 
     // Horizontal movement & boundaries
-    this.x = Math.max(100, this.x + this.vx);
-    camera.x = this.x - virtualWidth / 2;
+    if (storyMaster.isInsideApartment) {
+      this.x = Math.max(70, Math.min(940, this.x + this.vx));
+      const maxCamX = Math.max(0, 1024 - virtualWidth);
+      camera.x = Math.max(0, Math.min(maxCamX, this.x - virtualWidth / 2));
+    } else {
+      this.x = Math.max(100, this.x + this.vx);
+      camera.x = this.x - virtualWidth / 2;
+    }
 
     this.idleTimer += dt * 3;
 
@@ -274,6 +280,7 @@ function loadImage(defaultSrc, storageKey) {
 
 const assets = {
   background: loadImage('assets/background.png', 'background'),
+  interior: loadImage('assets/tatai_haz_interior.png', 'interior'),
   idle: loadImage('assets/zsomborr.png', 'idle'),
   walk1: loadImage('assets/walk1.png', 'walk1'),
   walk2: loadImage('assets/walk2.png', 'walk2'),
@@ -282,6 +289,28 @@ const assets = {
 
 // Background rendering
 function drawBackground(ctx) {
+  if (storyMaster.isInsideApartment) {
+    const intImg = assets.interior;
+    const bgWidth = 1024;
+    const bgHeight = 512;
+
+    if (intImg.complete && intImg.naturalWidth > 0) {
+      const screenX = -camera.x;
+      ctx.drawImage(intImg, screenX, 0, bgWidth, bgHeight);
+    } else {
+      ctx.fillStyle = '#2d1b0d';
+      ctx.fillRect(0, 0, virtualWidth, VIRTUAL_HEIGHT);
+      ctx.fillStyle = '#784315';
+      ctx.fillRect(0, GROUND_Y, virtualWidth, VIRTUAL_HEIGHT - GROUND_Y);
+    }
+
+    // Cozy fireplace embers floating up into chimney (fireplace at x ~ 625, y ~ 310)
+    if (Math.random() < 0.35) {
+      createDust(625 + (Math.random() * 24 - 12), 310 + (Math.random() * 12 - 6), 1, Math.random() > 0.4 ? '#f97316' : '#fbbf24');
+    }
+    return;
+  }
+
   const bgImg = assets.background;
   if (!bgImg.complete || bgImg.naturalWidth === 0) {
     ctx.fillStyle = '#659ad2';
@@ -360,6 +389,7 @@ bindTouch('btn-left', 'left');
 bindTouch('btn-right', 'right');
 bindTouch('btn-jump', 'jump');
 bindTouch('btn-run', 'run');
+bindTouch('btn-interact', 'interact');
 
 // Keyboard event listeners
 window.addEventListener('keydown', (e) => {
@@ -437,7 +467,9 @@ function gameLoop(timestamp) {
   // Render Scene
   drawBackground(ctx);
   storyMaster.drawApartment(ctx, camera.x, player);
-  bitManager.draw(ctx, camera.x, now);
+  if (!storyMaster.isInsideApartment) {
+    bitManager.draw(ctx, camera.x, now);
+  }
   updateAndDrawParticles(ctx, dt);
   player.draw(ctx);
 

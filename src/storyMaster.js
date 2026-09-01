@@ -9,8 +9,9 @@ export class StoryMaster {
     this.activeStoryId = 'Találd meg a tatai albérleted';
     this.currentStage = 0;
     this.isStoryComplete = false;
+    this.isInsideApartment = false;
 
-    // Apartment goal location in world coordinates
+    // Apartment goal location in outdoor world coordinates
     this.apartment = {
       x: 2360,
       y: 388,
@@ -19,6 +20,9 @@ export class StoryMaster {
       reached: false,
       glowTimer: 0
     };
+
+    // Interior ambiance timer
+    this.fireTimer = 0;
 
     this.initStories();
   }
@@ -100,6 +104,7 @@ export class StoryMaster {
   start() {
     this.currentStage = 0;
     this.isStoryComplete = false;
+    this.isInsideApartment = false;
     this.apartment.reached = false;
     this.updateTaskHUD();
     
@@ -148,7 +153,7 @@ export class StoryMaster {
   }
 
   onPlayerMove(playerX) {
-    if (this.currentStage === 0 && playerX > 580) {
+    if (!this.isInsideApartment && this.currentStage === 0 && playerX > 580) {
       this.setStage(1);
     }
   }
@@ -169,14 +174,31 @@ export class StoryMaster {
   }
 
   checkApartmentInteraction(player) {
+    if (this.isInsideApartment) {
+      // Inside apartment checks
+      if (player.x > 840) {
+        return { canEnter: true, isExit: true, prompt: 'Nyomj [E] / Érintsd a kilépéshez!' };
+      }
+      if (player.x >= 580 && player.x <= 680) {
+        return { canEnter: false, prompt: '🔥 Hangulatos tatai kandalló' };
+      }
+      if (player.x >= 380 && player.x <= 520) {
+        return { canEnter: false, prompt: '🛋️ ZsomBro Streamer Kanapé' };
+      }
+      if (player.x < 240) {
+        return { canEnter: false, prompt: '🍳 Tatai Konyha & Hűtő' };
+      }
+      return null;
+    }
+
+    // Outdoor checks
     const pX = player.x;
     const aptX = this.apartment.x;
     const dist = Math.abs(pX - aptX);
 
-    // If close to apartment (within 90px)
-    if (dist < 90 && !this.apartment.reached) {
-      if (this.currentStage >= 3) {
-        return { canEnter: true, prompt: 'Nyomj [E] / Érintsd a belépéshez!' };
+    if (dist < 100) {
+      if (this.currentStage >= 3 || this.apartment.reached) {
+        return { canEnter: true, isExit: false, prompt: 'Nyomj [E] / Érintsd a belépéshez!' };
       } else {
         return { canEnter: false, prompt: 'Még nincs meg az 5 kristály bit kaució!' };
       }
@@ -186,20 +208,63 @@ export class StoryMaster {
 
   interactApartment(player) {
     const check = this.checkApartmentInteraction(player);
-    if (check && check.canEnter && !this.apartment.reached) {
+    if (!check || !check.canEnter) return false;
+
+    if (this.isInsideApartment) {
+      // Exit to outdoor
+      this.isInsideApartment = false;
+      player.x = 2300;
+      player.y = 388;
+      player.facingRight = false;
+      return true;
+    } else {
+      // Enter the Tata House!
+      this.isInsideApartment = true;
       this.apartment.reached = true;
       this.isStoryComplete = true;
-      this.setStage(4);
+      player.x = 880; // Start at entrance door on the right
+      player.y = 388;
+      player.facingRight = false;
+
+      if (this.currentStage < 4) {
+        this.setStage(4);
+      }
       return true;
     }
-    return false;
   }
 
   update(dt, time) {
     this.apartment.glowTimer += dt * 3;
+    this.fireTimer += dt * 4;
   }
 
   drawApartment(ctx, cameraX, player) {
+    if (this.isInsideApartment) {
+      // Draw interior interaction prompts if any
+      const check = this.checkApartmentInteraction(player);
+      if (check) {
+        ctx.save();
+        const pulse = Math.sin(this.fireTimer) * 3;
+        const promptX = player.x - cameraX;
+        const promptY = player.y - 145 + pulse;
+
+        ctx.fillStyle = check.canEnter ? '#22c55e' : 'rgba(22, 27, 34, 0.92)';
+        ctx.fillRect(promptX - 110, promptY - 12, 220, 24);
+        ctx.strokeStyle = check.canEnter ? '#ffffff' : '#f59e0b';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(promptX - 110, promptY - 12, 220, 24);
+
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '7.5px "Press Start 2P", monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(check.prompt, promptX, promptY);
+        ctx.restore();
+      }
+      return;
+    }
+
+    // Outdoor Tata House rendering
     const apt = this.apartment;
     const sx = apt.x - cameraX;
     const sy = apt.y; // Ground level
@@ -328,6 +393,7 @@ export class StoryMaster {
   reset() {
     this.currentStage = 0;
     this.isStoryComplete = false;
+    this.isInsideApartment = false;
     this.apartment.reached = false;
     if (this.bitManager) this.bitManager.reset();
     this.start();
