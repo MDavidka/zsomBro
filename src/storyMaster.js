@@ -31,20 +31,20 @@ export class StoryMaster {
         stages: [
           {
             stage: 0,
-            task: 'Indulj el Tatán és keresd az albérletet!',
+            task: 'Találd meg a tatai albérleted',
             dialogue: {
-              id: 'tata_intro_1',
+              id: 'dialog001',
               speaker: 'Narrátor',
-              text: 'Zsombor megérkezett Tatára! Cél: megtalálni a lefoglalt tatai albérletet és elindítani a streamet.'
+              text: 'E Játék egy bizonyos karakterrel kezdődik. Az ő neve zsombor , akinek egyetlen célja hogy eljusson a gépéhez és streamelni kezdjen.'
             }
           },
           {
             stage: 1,
-            task: 'Beszélj a főbérlővel a kaucióról!',
+            task: 'Gyűjts össze 5 kristály bitet (0/5)!',
             dialogue: {
-              id: 'tata_landlord_msg',
+              id: 'dialog002',
               speaker: 'Főbérlő',
-              text: 'Üdv Tatán! Az albérlet kulcsaihoz szükség lesz 5 lila kristály bit kaucióra. Keresd meg őket az úton!'
+              text: 'Üdv Tatán! Az albérlet kauciójához szükség lesz 5 lila kristály bitre. Gyűjtsd össze őket az úton!'
             }
           },
           {
@@ -54,18 +54,18 @@ export class StoryMaster {
           },
           {
             stage: 3,
-            task: 'Keresd meg és lépj be a tatai albérlet kapuján!',
+            task: 'Keresd meg és lépj be a tatai albérletbe!',
             dialogue: {
-              id: 'tata_bits_complete',
+              id: 'dialog003',
               speaker: 'Zsombor',
-              text: 'Megvan mind az 5 kristály bit! Most már csak be kell mennem a tatai albérletbe a fasor végén.'
+              text: 'Megvan mind az 5 kristály bit! Most menjünk a tatai albérlethez a fasor végén.'
             }
           },
           {
             stage: 4,
             task: '🏆 KÜLDETÉS TELJESÍTVE: A tatai albérlet megvan!',
             dialogue: {
-              id: 'tata_apartment_victory',
+              id: 'dialog004',
               speaker: 'Narrátor',
               text: 'Gratulálok! Sikeresen beköltöztél a tatai albérletedbe! A gép beállítva, indulhat a ZsomBro stream! 🎮🎉'
             }
@@ -103,7 +103,7 @@ export class StoryMaster {
     this.apartment.reached = false;
     this.updateTaskHUD();
     
-    // Play opening dialogue for stage 0
+    // Play opening dialogue 001 (Original Zsombor Intro)
     const stage0 = this.getStage(0);
     if (stage0 && stage0.dialogue) {
       this.dialogue.show({
@@ -148,7 +148,7 @@ export class StoryMaster {
   }
 
   onPlayerMove(playerX) {
-    if (this.currentStage === 0 && playerX > 600) {
+    if (this.currentStage === 0 && playerX > 580) {
       this.setStage(1);
     }
   }
@@ -176,7 +176,6 @@ export class StoryMaster {
     // If close to apartment (within 90px)
     if (dist < 90 && !this.apartment.reached) {
       if (this.currentStage >= 3) {
-        // Can enter apartment!
         return { canEnter: true, prompt: 'Nyomj [E] / Érintsd a belépéshez!' };
       } else {
         return { canEnter: false, prompt: 'Még nincs meg az 5 kristály bit kaució!' };

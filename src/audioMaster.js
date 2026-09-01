@@ -1,16 +1,15 @@
-// Audio Master - Voice Over & Dialogue Audio Engine with IndexedDB persistence
+// Audio Master - Voice Over & Dialogue Audio Engine with IndexedDB & LocalStorage persistence
 
 const DB_NAME = 'ZsomBroAudioDB';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE_NAME = 'dialogue_voices';
 
 class AudioMasterSystem {
   constructor() {
     this.db = null;
-    this.dbReady = this.initDB();
     this.currentAudio = null;
     this.previewAudio = null;
-    this.voicesCache = new Map(); // dialogueId -> { blob, objectUrl, name, size, type, updatedAt }
+    this.voicesCache = new Map(); // dialogueId -> { blob, objectUrl, dataUrl, name, size, duration, type, updatedAt }
     
     // Volume controls (persisted in localStorage)
     this.masterVolume = parseFloat(localStorage.getItem('zsombro_vol_master') || '1.0');
@@ -21,12 +20,46 @@ class AudioMasterSystem {
     // Dialogue Registry: catalogue of all known dialogue IDs in the game
     this.dialogueRegistry = new Map();
     this.listeners = new Set();
+
+    // Load localStorage backups first for instant availability
+    this.loadFromLocalStorage();
+    this.dbReady = this.initDB();
+  }
+
+  loadFromLocalStorage() {
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('zsombro_voice_data_')) {
+          const dialogueId = key.replace('zsombro_voice_data_', '');
+          const dataUrl = localStorage.getItem(key);
+          const metaJson = localStorage.getItem('zsombro_voice_meta_' + dialogueId);
+          let meta = {};
+          if (metaJson) {
+            try { meta = JSON.parse(metaJson); } catch (e) {}
+          }
+          if (dataUrl) {
+            this.voicesCache.set(dialogueId, {
+              objectUrl: dataUrl,
+              dataUrl: dataUrl,
+              name: meta.name || `${dialogueId}.mp3`,
+              size: meta.size || Math.round(dataUrl.length * 0.75),
+              duration: meta.duration || 0,
+              type: meta.type || 'audio/mp3',
+              updatedAt: meta.updatedAt || Date.now()
+            });
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Could not load voices from localStorage', e);
+    }
   }
 
   async initDB() {
     return new Promise((resolve) => {
       if (!window.indexedDB) {
-        console.warn('IndexedDB not supported, using in-memory audio store.');
+        console.warn('IndexedDB not supported, using in-memory and localStorage audio store.');
         resolve(null);
         return;
       }
@@ -59,14 +92,19 @@ class AudioMasterSystem {
         req.onsuccess = () => {
           const records = req.result || [];
           records.forEach((rec) => {
-            if (rec && rec.dialogueId && rec.blob) {
-              const url = URL.createObjectURL(rec.blob);
+            if (rec && rec.dialogueId && (rec.blob || rec.dataUrl)) {
+              let url = rec.dataUrl;
+              if (rec.blob) {
+                url = URL.createObjectURL(rec.blob);
+              }
               this.voicesCache.set(rec.dialogueId, {
                 blob: rec.blob,
                 objectUrl: url,
+                dataUrl: rec.dataUrl,
                 name: rec.name || `${rec.dialogueId}.mp3`,
-                size: rec.size || rec.blob.size,
-                type: rec.type || rec.blob.type || 'audio/mp3',
+                size: rec.size || (rec.blob ? rec.blob.size : 0),
+                duration: rec.duration || 0,
+                type: rec.type || 'audio/mp3',
                 updatedAt: rec.updatedAt || Date.now()
               });
             }
@@ -97,7 +135,8 @@ class AudioMasterSystem {
   }
 
   hasVoice(dialogueId) {
-    return this.voicesCache.has(dialogueId);
+    const item = this.voicesCache.get(dialogueId);
+    return !!(item && (item.objectUrl || item.dataUrl));
   }
 
   getVoiceInfo(dialogueId) {
@@ -107,32 +146,69 @@ class AudioMasterSystem {
   async saveVoice(dialogueId, fileOrBlob, fileName = '') {
     await this.dbReady;
     const blob = fileOrBlob;
-    const url = URL.createObjectURL(blob);
-    
-    // Revoke old URL if present
-    const old = this.voicesCache.get(dialogueId);
-    if (old && old.objectUrl) {
-      URL.revokeObjectURL(old.objectUrl);
+    const name = fileName || fileOrBlob.name || `${dialogueId}.mp3`;
+
+    // Convert to DataURL for immediate playback and localStorage persistence
+    const dataUrl = await new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => resolve(e.target.result);
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(blob);
+    });
+
+    // Detect audio duration
+    let duration = 0;
+    if (dataUrl) {
+      try {
+        duration = await new Promise((resolve) => {
+          const tempAudio = new Audio();
+          tempAudio.src = dataUrl;
+          tempAudio.onloadedmetadata = () => resolve(tempAudio.duration);
+          tempAudio.onerror = () => resolve(0);
+        });
+      } catch (e) {}
     }
 
     const record = {
       dialogueId,
       blob,
-      name: fileName || fileOrBlob.name || `${dialogueId}.mp3`,
+      dataUrl,
+      name,
       size: blob.size,
+      duration: Math.round(duration * 10) / 10,
       type: blob.type || 'audio/mp3',
       updatedAt: Date.now()
     };
 
+    // Save in cache
     this.voicesCache.set(dialogueId, {
       blob,
-      objectUrl: url,
+      objectUrl: dataUrl || URL.createObjectURL(blob),
+      dataUrl,
       name: record.name,
       size: record.size,
+      duration: record.duration,
       type: record.type,
       updatedAt: record.updatedAt
     });
 
+    // Save in localStorage if under 4MB
+    if (dataUrl && dataUrl.length < 4 * 1024 * 1024) {
+      try {
+        localStorage.setItem('zsombro_voice_data_' + dialogueId, dataUrl);
+        localStorage.setItem('zsombro_voice_meta_' + dialogueId, JSON.stringify({
+          name: record.name,
+          size: record.size,
+          duration: record.duration,
+          type: record.type,
+          updatedAt: record.updatedAt
+        }));
+      } catch (err) {
+        console.warn('localStorage full, voice saved in IndexedDB and memory only', err);
+      }
+    }
+
+    // Save in IndexedDB
     if (this.db) {
       try {
         const tx = this.db.transaction(STORE_NAME, 'readwrite');
@@ -150,10 +226,15 @@ class AudioMasterSystem {
   async deleteVoice(dialogueId) {
     await this.dbReady;
     const item = this.voicesCache.get(dialogueId);
-    if (item && item.objectUrl) {
+    if (item && item.objectUrl && item.objectUrl.startsWith('blob:')) {
       URL.revokeObjectURL(item.objectUrl);
     }
     this.voicesCache.delete(dialogueId);
+
+    try {
+      localStorage.removeItem('zsombro_voice_data_' + dialogueId);
+      localStorage.removeItem('zsombro_voice_meta_' + dialogueId);
+    } catch (e) {}
 
     if (this.db) {
       try {
@@ -171,12 +252,14 @@ class AudioMasterSystem {
   playVoice(dialogueId, onEnded = null) {
     this.stopVoice();
     const item = this.voicesCache.get(dialogueId);
-    if (!item || !item.objectUrl) {
+    if (!item || (!item.objectUrl && !item.dataUrl)) {
       return false;
     }
 
+    const audioSrc = item.objectUrl || item.dataUrl;
+
     try {
-      const audio = new Audio(item.objectUrl);
+      const audio = new Audio(audioSrc);
       const effectiveVolume = Math.max(0, Math.min(1, this.masterVolume * this.voiceVolume));
       audio.volume = effectiveVolume;
 
@@ -222,10 +305,12 @@ class AudioMasterSystem {
   playPreview(dialogueId) {
     this.stopPreview();
     const item = this.voicesCache.get(dialogueId);
-    if (!item || !item.objectUrl) return false;
+    if (!item || (!item.objectUrl && !item.dataUrl)) return false;
+
+    const audioSrc = item.objectUrl || item.dataUrl;
 
     try {
-      const audio = new Audio(item.objectUrl);
+      const audio = new Audio(audioSrc);
       audio.volume = Math.max(0, Math.min(1, this.masterVolume * this.voiceVolume));
       audio.onended = () => {
         if (this.previewAudio === audio) this.previewAudio = null;

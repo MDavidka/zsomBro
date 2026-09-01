@@ -72,7 +72,7 @@ class DialogueSystem {
     this.typewriterIndex = 0;
     this.currentOnDismiss = onDismiss;
 
-    // Register with audio master if not already present
+    // Register with audio master
     if (id) {
       audioMaster.registerDialogue(id, { speaker, text });
     }
@@ -96,9 +96,9 @@ class DialogueSystem {
 
     this.container.classList.remove('hidden');
 
-    // Play MP3 voiceover if available
+    // Play real MP3 voiceover if available
     const voicePlayed = audioMaster.playVoice(this.currentId, () => {
-      // Voice ended callback
+      // Voice completed callback
     });
 
     this.startTypewriter(duration, voicePlayed);
@@ -108,7 +108,7 @@ class DialogueSystem {
     this.clearTimers();
     this.isTyping = true;
 
-    // If custom voice audio is playing, typewriter runs smoothly
+    // Smooth typing speed when real voice is playing
     const speed = hasVoiceAudio ? 28 : 36;
 
     this.typewriterInterval = setInterval(() => {
@@ -116,7 +116,7 @@ class DialogueSystem {
         this.currentText += this.targetText[this.typewriterIndex];
         if (this.textElem) this.textElem.textContent = this.currentText;
         
-        // If no voice audio is playing, emit 8-bit sound tones
+        // If no MP3 voice audio is playing, emit 8-bit sound tones
         if (!hasVoiceAudio && this.typewriterIndex % 2 === 0 && this.targetText[this.typewriterIndex] !== ' ') {
           sound.playTone(430 + (this.typewriterIndex % 4) * 35, 'square', 0.035, 0.04);
         }
@@ -268,7 +268,7 @@ export function initAdmin(assets, bitManager, storyMaster, onAssetUpdated, onTri
     if (onTriggerDialogue) onTriggerDialogue(testId, speaker, text);
   });
 
-  // Audio Master List Renderer
+  // Audio Master List Renderer with Real MP3 Player Controls
   function renderAudioMasterList() {
     const container = document.getElementById('audio-master-list');
     if (!container) return;
@@ -286,30 +286,41 @@ export function initAdmin(assets, bitManager, storyMaster, onAssetUpdated, onTri
 
       const row = document.createElement('div');
       row.className = 'audio-item-card';
+
+      const durStr = voiceInfo && voiceInfo.duration ? ` (${voiceInfo.duration}s)` : '';
+      const sizeStr = voiceInfo && voiceInfo.size ? ` • ${(voiceInfo.size / 1024).toFixed(1)} KB` : '';
+
       row.innerHTML = `
         <div class="audio-item-header">
           <span class="dialogue-id-tag">ID: <strong>${dlg.id}</strong></span>
           <span class="voice-badge ${hasVoice ? 'has-voice' : 'no-voice'}">
-            ${hasVoice ? '🎵 MP3 HANG FELTÖLTVE' : '🔇 SZINTETIZÁLT HANG'}
+            ${hasVoice ? `✅ MP3 HANG BETÖLTVE${durStr}` : '🔇 8-BIT SZINTETIZÁLT'}
           </span>
         </div>
         <div class="audio-dialogue-preview">
           <span class="speaker-tag">${dlg.speaker}:</span> "${dlg.text}"
         </div>
+        
+        ${hasVoice && (voiceInfo.objectUrl || voiceInfo.dataUrl) ? `
+          <div class="audio-player-wrapper">
+            <audio controls class="real-audio-player" src="${voiceInfo.objectUrl || voiceInfo.dataUrl}"></audio>
+            <span class="audio-file-meta">${voiceInfo.name || dlg.id + '.mp3'}${sizeStr}</span>
+          </div>
+        ` : ''}
+
         <div class="audio-actions">
           <label class="upload-mp3-btn">
-            📁 MP3 Feltöltése
-            <input type="file" accept="audio/*" class="voice-file-input" data-id="${dlg.id}" style="display:none;" />
+            📁 ${hasVoice ? 'MP3 Módosítása' : 'MP3 Feltöltése'}
+            <input type="file" accept="audio/mp3,audio/*" class="voice-file-input" data-id="${dlg.id}" style="display:none;" />
           </label>
           ${hasVoice ? `
-            <button class="preview-btn retro-btn" data-id="${dlg.id}">▶ Lejátszás</button>
-            <button class="delete-voice-btn danger-btn retro-btn" data-id="${dlg.id}">🗑 Törlés</button>
+            <button class="delete-voice-btn danger-btn retro-btn" data-id="${dlg.id}">🗑 MP3 Törlése</button>
           ` : ''}
-          <button class="trigger-dialogue-btn retro-btn" data-id="${dlg.id}">💬 Tesztelés Képernyőn</button>
+          <button class="trigger-dialogue-btn retro-btn" data-id="${dlg.id}">💬 Tesztelés Játékban</button>
         </div>
       `;
 
-      // Event listeners for this row
+      // Event listeners for file upload
       const fileInput = row.querySelector('.voice-file-input');
       fileInput?.addEventListener('change', async (e) => {
         const file = e.target.files[0];
@@ -317,11 +328,6 @@ export function initAdmin(assets, bitManager, storyMaster, onAssetUpdated, onTri
           await audioMaster.saveVoice(dlg.id, file, file.name);
           renderAudioMasterList();
         }
-      });
-
-      const previewBtn = row.querySelector('.preview-btn');
-      previewBtn?.addEventListener('click', () => {
-        audioMaster.playPreview(dlg.id);
       });
 
       const deleteBtn = row.querySelector('.delete-voice-btn');
@@ -366,8 +372,8 @@ export function initAdmin(assets, bitManager, storyMaster, onAssetUpdated, onTri
 
     let stagesHtml = story.stages.map((st, idx) => `
       <div class="story-stage-row ${idx === storyMaster.currentStage ? 'active-stage' : ''}">
-        <div class="stage-num">${idx === storyMaster.currentStage ? '▶ Fázis ' + idx : 'Fázis ' + idx}</div>
-        <div class="stage-task"><strong>Feladat:</strong> ${st.task}</div>
+        <div class="stage-num">${idx === storyMaster.currentStage ? '▶ Aktív Fázis ' + idx : 'Fázis ' + idx}</div>
+        <div class="stage-task"><strong>Küldetés/Feladat:</strong> ${st.task}</div>
         ${st.dialogue ? `<div class="stage-dlg"><strong>Dialógus (${st.dialogue.id}):</strong> ${st.dialogue.speaker}: "${st.dialogue.text}"</div>` : ''}
       </div>
     `).join('');
