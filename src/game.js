@@ -1,6 +1,7 @@
 import { sound } from './audio.js';
+import { dialogue, initAdmin } from './dialogue.js';
 
-// Elements
+// Canvas Elements
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
@@ -40,7 +41,7 @@ const camera = {
   x: 0
 };
 
-// Player Object defined FIRST before any listeners
+// Player Object (Zsomborr)
 const player = {
   name: 'Zsomborr',
   x: 512,
@@ -183,7 +184,6 @@ const player = {
         this.height
       );
     } else {
-      // Fallback
       ctx.fillStyle = '#ffcc00';
       ctx.fillRect(-renderWidth / 2, -this.height, renderWidth, this.height);
     }
@@ -211,20 +211,28 @@ window.addEventListener('resize', resize);
 window.addEventListener('orientationchange', () => setTimeout(resize, 100));
 resize();
 
-// Assets
-function loadImage(src) {
+// Assets Loader with LocalStorage Persistence
+function loadImage(defaultSrc, storageKey) {
   const img = new Image();
-  img.src = src;
+  const saved = localStorage.getItem('custom_asset_' + storageKey);
+  img.src = saved || defaultSrc;
   return img;
 }
 
 const assets = {
-  background: loadImage('assets/background.png'),
-  idle: loadImage('assets/zsomborr.png'),
-  walk1: loadImage('assets/walk1.png'),
-  walk2: loadImage('assets/walk2.png'),
-  run1: loadImage('assets/run1.png')
+  background: loadImage('assets/background.png', 'background'),
+  idle: loadImage('assets/zsomborr.png', 'idle'),
+  walk1: loadImage('assets/walk1.png', 'walk1'),
+  walk2: loadImage('assets/walk2.png', 'walk2'),
+  run1: loadImage('assets/run1.png', 'run1')
 };
+
+// Check if custom dialogue box frame exists in localStorage
+const savedDialogueBg = localStorage.getItem('custom_asset_dialogue');
+if (savedDialogueBg) {
+  const bg = document.getElementById('dialogue-bg');
+  if (bg) bg.src = savedDialogueBg;
+}
 
 // Background rendering
 function drawBackground(ctx) {
@@ -271,7 +279,7 @@ function updateAndDrawParticles(ctx, dt) {
   ctx.globalAlpha = 1.0;
 }
 
-// Mobile touch button helper
+// Mobile touch button bindings
 function bindTouch(btnId, keyName) {
   const btn = document.getElementById(btnId);
   if (!btn) return;
@@ -327,7 +335,25 @@ window.addEventListener('keyup', (e) => {
 
 window.addEventListener('pointerdown', () => sound.init(), { once: true });
 
-// Game loop
+// Initialize Admin System
+initAdmin(assets, (assetKey, dataUrl) => {
+  if (assetKey === 'idle') {
+    const avatar = document.getElementById('dialogue-avatar');
+    if (avatar) avatar.src = dataUrl;
+  }
+});
+
+// Start Story Opening Dialogue
+setTimeout(() => {
+  dialogue.show({
+    speaker: 'Narrátor',
+    text: 'E Játék egy bizonyos karakterrel kezdődik. Az ő neve zsombor , akinek egyetlen célja hogy eljusson a gépéhez és streamelni kezdjen.',
+    duration: 10000,
+    avatar: assets.idle.src
+  });
+}, 500);
+
+// Main game loop
 let lastTime = performance.now();
 
 function gameLoop(timestamp) {

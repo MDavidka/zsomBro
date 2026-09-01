@@ -7,13 +7,79 @@
   <link rel="stylesheet" href="style.css" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
 </head>
 <body>
   <div id="game-wrapper">
     <canvas id="gameCanvas"></canvas>
-    
-    <!-- Mobile Touch Controls (only shown on touch/mobile) -->
+
+    <!-- Admin Gear Toggle -->
+    <button id="admin-toggle-btn" class="icon-btn" title="Admin Settings">⚙️</button>
+
+    <!-- Global Dialogue / Chatbox System -->
+    <div id="dialogue-container" class="hidden">
+      <div id="dialogue-box">
+        <img id="dialogue-bg" src="assets/dialogue_box.png" alt="Dialogue Frame" />
+        <div id="dialogue-avatar-container">
+          <img id="dialogue-avatar" src="assets/zsomborr.png" alt="Avatar" />
+        </div>
+        <div id="dialogue-speaker">Narrátor</div>
+        <div id="dialogue-text-container">
+          <p id="dialogue-text"></p>
+        </div>
+        <div id="dialogue-arrow">▼</div>
+      </div>
+    </div>
+
+    <!-- Admin Settings Modal -->
+    <div id="admin-modal" class="modal hidden">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>🛠️ ADMIN ASSET MANAGER</h2>
+          <button id="admin-close-btn" class="close-btn">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="asset-grid">
+            <div class="asset-card">
+              <label>🌄 Background Image</label>
+              <input type="file" id="upload-background" accept="image/*" />
+            </div>
+            <div class="asset-card">
+              <label>💬 Dialogue Box Frame</label>
+              <input type="file" id="upload-dialogue" accept="image/*" />
+            </div>
+            <div class="asset-card">
+              <label>🧍 Character (Idle)</label>
+              <input type="file" id="upload-idle" accept="image/*" />
+            </div>
+            <div class="asset-card">
+              <label>🚶 Walk 1</label>
+              <input type="file" id="upload-walk1" accept="image/*" />
+            </div>
+            <div class="asset-card">
+              <label>🚶 Walk 2</label>
+              <input type="file" id="upload-walk2" accept="image/*" />
+            </div>
+            <div class="asset-card">
+              <label>🏃 Run 1</label>
+              <input type="file" id="upload-run1" accept="image/*" />
+            </div>
+          </div>
+
+          <div class="dialogue-tester">
+            <label>💬 Test Custom Dialogue</label>
+            <input type="text" id="test-speaker" placeholder="Speaker Name (e.g. Zsombor)" value="Zsombor" />
+            <textarea id="test-message" placeholder="Type test message here...">Gyerünk, kezdődjön a stream!</textarea>
+            <button id="test-dialogue-btn" class="retro-btn">Trigger Dialogue</button>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button id="reset-assets-btn" class="retro-btn danger-btn">Reset to Default Assets</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mobile Touch Controls -->
     <div id="mobile-controls">
       <div class="mobile-dpad">
         <button id="btn-left" class="touch-btn">◀</button>
