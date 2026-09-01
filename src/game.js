@@ -1,46 +1,21 @@
 import { sound } from './audio.js';
 
+// Elements
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
-// Virtual coordinate system (Height fixed to background height 512)
+// Virtual coordinate system (Height fixed to 512)
 const VIRTUAL_HEIGHT = 512;
 let virtualWidth = 1024;
 let scale = 1;
+const GROUND_Y = 380;
 
-function resize() {
-  const w = window.innerWidth || document.documentElement.clientWidth || 1024;
-  const h = window.innerHeight || document.documentElement.clientHeight || 512;
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
-
-  canvas.width = Math.round(w * dpr);
-  canvas.height = Math.round(h * dpr);
-
-  scale = canvas.height / VIRTUAL_HEIGHT;
-  virtualWidth = canvas.width / scale;
-
-  ctx.imageSmoothingEnabled = false;
-}
-
-window.addEventListener('resize', resize);
-window.addEventListener('orientationchange', () => setTimeout(resize, 100));
-resize();
-
-const GROUND_Y = 380; // Ground platform level
-
-// Sprite Assets
-function loadImage(src) {
-  const img = new Image();
-  img.src = src;
-  return img;
-}
-
-const assets = {
-  background: loadImage('assets/background.png'),
-  idle: loadImage('assets/zsomborr.png'),
-  walk1: loadImage('assets/walk1.png'),
-  walk2: loadImage('assets/walk2.png'),
-  run1: loadImage('assets/run1.png')
+// Input state
+const keys = {
+  left: false,
+  right: false,
+  jump: false,
+  run: false
 };
 
 // Particles for dust effects
@@ -60,77 +35,12 @@ function createDust(x, y, count = 3, color = 'rgba(230, 245, 230, 0.75)') {
   }
 }
 
-// Input state
-const keys = {
-  left: false,
-  right: false,
-  jump: false,
-  run: false
-};
-
-// Keyboard events
-window.addEventListener('keydown', (e) => {
-  sound.init();
-  if (e.code === 'ArrowLeft' || e.code === 'KeyA') keys.left = true;
-  if (e.code === 'ArrowRight' || e.code === 'KeyD') keys.right = true;
-  if (e.code === 'ArrowUp' || e.code === 'KeyW' || e.code === 'Space') {
-    if (!keys.jump) {
-      player.tryJump();
-    }
-    keys.jump = true;
-    e.preventDefault();
-  }
-  if (e.shiftKey || e.code === 'ShiftLeft' || e.code === 'ShiftRight') keys.run = true;
-});
-
-window.addEventListener('keyup', (e) => {
-  if (e.code === 'ArrowLeft' || e.code === 'KeyA') keys.left = false;
-  if (e.code === 'ArrowRight' || e.code === 'KeyD') keys.right = false;
-  if (e.code === 'ArrowUp' || e.code === 'KeyW' || e.code === 'Space') keys.jump = false;
-  if (!e.shiftKey && (e.code === 'ShiftLeft' || e.code === 'ShiftRight')) keys.run = false;
-});
-
-// Mobile touch button helper
-function bindTouch(btnId, keyName) {
-  const btn = document.getElementById(btnId);
-  if (!btn) return;
-  const start = (e) => {
-    e.preventDefault();
-    sound.init();
-    btn.classList.add('active');
-    if (keyName === 'jump') {
-      player.tryJump();
-      keys.jump = true;
-    } else {
-      keys[keyName] = true;
-    }
-  };
-  const end = (e) => {
-    e.preventDefault();
-    btn.classList.remove('active');
-    keys[keyName] = false;
-  };
-  btn.addEventListener('touchstart', start, { passive: false });
-  btn.addEventListener('touchend', end, { passive: false });
-  btn.addEventListener('mousedown', start);
-  btn.addEventListener('mouseup', end);
-  btn.addEventListener('mouseleave', end);
-}
-
-bindTouch('btn-left', 'left');
-bindTouch('btn-right', 'right');
-bindTouch('btn-jump', 'jump');
-bindTouch('btn-run', 'run');
-
-// Enable audio context on first screen touch/click
-window.addEventListener('pointerdown', () => sound.init(), { once: true });
-
 // Camera
 const camera = {
   x: 0
 };
 
-// Player (Zsomborr)
+// Player Object defined FIRST before any listeners
 const player = {
   name: 'Zsomborr',
   x: 512,
@@ -273,7 +183,7 @@ const player = {
         this.height
       );
     } else {
-      // Fallback silhouette if image is still loading
+      // Fallback
       ctx.fillStyle = '#ffcc00';
       ctx.fillRect(-renderWidth / 2, -this.height, renderWidth, this.height);
     }
@@ -282,14 +192,46 @@ const player = {
   }
 };
 
+// Canvas Resize
+function resize() {
+  const w = window.innerWidth || document.documentElement.clientWidth || 1024;
+  const h = window.innerHeight || document.documentElement.clientHeight || 512;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+  canvas.width = Math.round(w * dpr);
+  canvas.height = Math.round(h * dpr);
+
+  scale = canvas.height / VIRTUAL_HEIGHT;
+  virtualWidth = canvas.width / scale;
+
+  ctx.imageSmoothingEnabled = false;
+}
+
+window.addEventListener('resize', resize);
+window.addEventListener('orientationchange', () => setTimeout(resize, 100));
+resize();
+
+// Assets
+function loadImage(src) {
+  const img = new Image();
+  img.src = src;
+  return img;
+}
+
+const assets = {
+  background: loadImage('assets/background.png'),
+  idle: loadImage('assets/zsomborr.png'),
+  walk1: loadImage('assets/walk1.png'),
+  walk2: loadImage('assets/walk2.png'),
+  run1: loadImage('assets/run1.png')
+};
+
 // Background rendering
 function drawBackground(ctx) {
   const bgImg = assets.background;
   if (!bgImg.complete || bgImg.naturalWidth === 0) {
-    // Sky fallback
     ctx.fillStyle = '#659ad2';
     ctx.fillRect(0, 0, virtualWidth, VIRTUAL_HEIGHT);
-    // Ground fallback
     ctx.fillStyle = '#4f7d3c';
     ctx.fillRect(0, GROUND_Y, virtualWidth, VIRTUAL_HEIGHT - GROUND_Y);
     return;
@@ -328,6 +270,62 @@ function updateAndDrawParticles(ctx, dt) {
   }
   ctx.globalAlpha = 1.0;
 }
+
+// Mobile touch button helper
+function bindTouch(btnId, keyName) {
+  const btn = document.getElementById(btnId);
+  if (!btn) return;
+  const start = (e) => {
+    e.preventDefault();
+    sound.init();
+    btn.classList.add('active');
+    if (keyName === 'jump') {
+      player.tryJump();
+      keys.jump = true;
+    } else {
+      keys[keyName] = true;
+    }
+  };
+  const end = (e) => {
+    e.preventDefault();
+    btn.classList.remove('active');
+    keys[keyName] = false;
+  };
+  btn.addEventListener('touchstart', start, { passive: false });
+  btn.addEventListener('touchend', end, { passive: false });
+  btn.addEventListener('mousedown', start);
+  btn.addEventListener('mouseup', end);
+  btn.addEventListener('mouseleave', end);
+}
+
+bindTouch('btn-left', 'left');
+bindTouch('btn-right', 'right');
+bindTouch('btn-jump', 'jump');
+bindTouch('btn-run', 'run');
+
+// Keyboard event listeners
+window.addEventListener('keydown', (e) => {
+  sound.init();
+  if (e.code === 'ArrowLeft' || e.code === 'KeyA') keys.left = true;
+  if (e.code === 'ArrowRight' || e.code === 'KeyD') keys.right = true;
+  if (e.code === 'ArrowUp' || e.code === 'KeyW' || e.code === 'Space') {
+    if (!keys.jump) {
+      player.tryJump();
+    }
+    keys.jump = true;
+    e.preventDefault();
+  }
+  if (e.shiftKey || e.code === 'ShiftLeft' || e.code === 'ShiftRight') keys.run = true;
+});
+
+window.addEventListener('keyup', (e) => {
+  if (e.code === 'ArrowLeft' || e.code === 'KeyA') keys.left = false;
+  if (e.code === 'ArrowRight' || e.code === 'KeyD') keys.right = false;
+  if (e.code === 'ArrowUp' || e.code === 'KeyW' || e.code === 'Space') keys.jump = false;
+  if (!e.shiftKey && (e.code === 'ShiftLeft' || e.code === 'ShiftRight')) keys.run = false;
+});
+
+window.addEventListener('pointerdown', () => sound.init(), { once: true });
 
 // Game loop
 let lastTime = performance.now();
